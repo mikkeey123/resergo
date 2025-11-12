@@ -37,3 +37,10 @@ Thumbs.db
 # Build outputs
 build
 *.tsbuildinfo
+
+# Large media files (host elsewhere)
+*.mp4
+*.mov
+*.avi
+# Uncomment the line below if you want to keep showcase.mp4 local but not in git
+# src/assets/showcase.mp4
