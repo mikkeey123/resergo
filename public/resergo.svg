@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="180" height="50" viewBox="0 0 300 80">
+  <!-- Icon -->
+  <circle cx="40" cy="40" r="18" fill="#4F46E5"></circle>
+  <path d="M40 28 L48 40 L40 52 L32 40 Z" fill="white"></path>
+  
+  <!-- Text -->
+  <text x="70" y="48" font-family="Poppins, sans-serif" font-size="32" font-weight="700" fill="#4F46E5">
+    Reser<tspan fill="#10B981">Go</tspan>
+  </text>
+</svg>
