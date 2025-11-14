@@ -54,7 +54,6 @@ const WithdrawModal = React.memo(({
     const handleEmailChange = useCallback((e) => {
         const input = e.target;
         const newValue = input.value;
-        const cursorPosition = input.selectionStart;
         
         // Update ref immediately
         emailValueRef.current = newValue;
@@ -67,14 +66,11 @@ const WithdrawModal = React.memo(({
         };
         onEmailChange(syntheticEvent);
         
-        // Ensure focus stays and cursor position is correct
+        // Ensure focus stays (email input doesn't support setSelectionRange)
         requestAnimationFrame(() => {
             if (input && document.activeElement !== input) {
                 input.focus();
             }
-            // Restore cursor position
-            const newPosition = Math.min(cursorPosition, newValue.length);
-            input.setSelectionRange(newPosition, newPosition);
             isTypingRef.current = false;
         });
     }, [onEmailChange]);
