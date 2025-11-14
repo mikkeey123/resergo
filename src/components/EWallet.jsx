@@ -20,8 +20,18 @@ const WithdrawModal = React.memo(({
     const emailInputRef = useRef(null);
     const amountInputRef = useRef(null);
     const hasFocusedOnMount = useRef(false);
-    const emailWasFocusedRef = useRef(false);
-    const emailCursorPositionRef = useRef(null);
+    const emailValueRef = useRef(withdrawEmail);
+    const isTypingRef = useRef(false);
+
+    // Sync ref with prop value only when not typing
+    useEffect(() => {
+        if (!isTypingRef.current) {
+            emailValueRef.current = withdrawEmail;
+            if (emailInputRef.current) {
+                emailInputRef.current.value = withdrawEmail;
+            }
+        }
+    }, [withdrawEmail]);
 
     // Focus amount input only when modal first opens
     useEffect(() => {
@@ -35,20 +45,39 @@ const WithdrawModal = React.memo(({
         // Reset focus flag when modal closes
         if (!showWithdrawModal) {
             hasFocusedOnMount.current = false;
+            isTypingRef.current = false;
+            emailValueRef.current = withdrawEmail;
         }
-    }, [showWithdrawModal]);
+    }, [showWithdrawModal, withdrawEmail]);
 
-    // Preserve focus on email input when typing - restore after render
-    useLayoutEffect(() => {
-        if (showWithdrawModal && emailInputRef.current && emailWasFocusedRef.current) {
-            emailInputRef.current.focus();
-            // Restore cursor position if we have it
-            if (emailCursorPositionRef.current !== null) {
-                const position = emailCursorPositionRef.current;
-                emailInputRef.current.setSelectionRange(position, position);
+    // Handle email input change - use ref to prevent re-renders
+    const handleEmailChange = useCallback((e) => {
+        const input = e.target;
+        const newValue = input.value;
+        const cursorPosition = input.selectionStart;
+        
+        // Update ref immediately
+        emailValueRef.current = newValue;
+        isTypingRef.current = true;
+        
+        // Update parent state
+        const syntheticEvent = {
+            target: { value: newValue },
+            currentTarget: input
+        };
+        onEmailChange(syntheticEvent);
+        
+        // Ensure focus stays and cursor position is correct
+        requestAnimationFrame(() => {
+            if (input && document.activeElement !== input) {
+                input.focus();
             }
-        }
-    });
+            // Restore cursor position
+            const newPosition = Math.min(cursorPosition, newValue.length);
+            input.setSelectionRange(newPosition, newPosition);
+            isTypingRef.current = false;
+        });
+    }, [onEmailChange]);
 
     if (!showWithdrawModal) return null;
 
@@ -105,19 +134,8 @@ const WithdrawModal = React.memo(({
                         <input
                             ref={emailInputRef}
                             type="email"
-                            value={withdrawEmail}
-                            onChange={(e) => {
-                                // Track focus state before onChange
-                                emailWasFocusedRef.current = document.activeElement === emailInputRef.current;
-                                emailCursorPositionRef.current = emailInputRef.current?.selectionStart || null;
-                                onEmailChange(e);
-                            }}
-                            onFocus={() => {
-                                emailWasFocusedRef.current = true;
-                            }}
-                            onBlur={() => {
-                                emailWasFocusedRef.current = false;
-                            }}
+                            defaultValue={withdrawEmail}
+                            onChange={handleEmailChange}
                             className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 transition"
                             placeholder="your.email@example.com"
                             required
@@ -378,7 +396,9 @@ const EWallet = ({ userId = null }) => {
             return;
         }
 
-        if (!withdrawEmail || !withdrawEmail.includes("@")) {
+        // Get email from ref if available (for uncontrolled input)
+        const emailValue = emailInputRef.current?.value || withdrawEmail;
+        if (!emailValue || !emailValue.includes("@")) {
             alert("Please enter a valid PayPal email address");
             return;
         }
@@ -388,11 +408,13 @@ const EWallet = ({ userId = null }) => {
             const targetUserId = userId || currentUserId;
             const amount = parseFloat(withdrawAmount);
             
+            // Use email from ref if available
+            const emailValue = emailInputRef.current?.value || withdrawEmail;
             const result = await withdrawFromWallet(
                 targetUserId,
                 amount,
                 "paypal",
-                { email: withdrawEmail }
+                { email: emailValue }
             );
             
             setBalance(result.newBalance);
