@@ -246,7 +246,6 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
 
             const listingData = {
                 category,
-                title,
                 rate: parseFloat(rate) || 0,
                 images,
                 location: {
@@ -256,15 +255,20 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
                     longitude: parseFloat(longitude) || 0
                 },
                 description,
-                basics: {
+                availability: {}
+            };
+
+            // Only include title, basics, and amenities for Home category
+            if (category === "Home") {
+                listingData.title = title;
+                listingData.basics = {
                     guests,
                     bedrooms,
                     beds,
                     bathrooms
-                },
-                amenities,
-                availability: {}
-            };
+                };
+                listingData.amenities = amenities;
+            }
 
             if (editingListing) {
                 // Update existing listing
@@ -297,7 +301,8 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
         setLoading(true);
 
         // Validation
-        if (!title.trim()) {
+        // Title only required for Home category
+        if (category === "Home" && !title.trim()) {
             setError("Title is required");
             setLoading(false);
             return;
@@ -331,7 +336,6 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
 
             const listingData = {
                 category,
-                title,
                 rate: parseFloat(rate) || 0,
                 images,
                 location: {
@@ -341,15 +345,20 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
                     longitude: parseFloat(longitude) || 0
                 },
                 description,
-                basics: {
+                availability: {}
+            };
+
+            // Only include title, basics, and amenities for Home category
+            if (category === "Home") {
+                listingData.title = title;
+                listingData.basics = {
                     guests,
                     bedrooms,
                     beds,
                     bathrooms
-                },
-                amenities,
-                availability: {}
-            };
+                };
+                listingData.amenities = amenities;
+            }
 
             if (editingListing) {
                 // Update existing listing
@@ -432,7 +441,9 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
 
                         {/* Images Section */}
                         <div>
-                            <h3 className="text-2xl font-bold text-gray-900 mb-2">Add some photos of your house</h3>
+                            <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                                {category === "Home" ? "Add some photos of your house" : category === "Experience" ? "Add some photos of your experience" : "Add some photos of your service"}
+                            </h3>
                             <p className="text-gray-600 mb-2">Add photos to showcase your listing. <span className="font-semibold text-red-600">Exactly 5 images are required</span> to publish a listing.</p>
                             <p className="text-sm text-blue-600 mb-6 font-medium">
                                 {images.length > 0 
@@ -575,20 +586,22 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
                             )}
                         </div>
 
-                        {/* Title */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Title *
-                            </label>
-                            <input
-                                type="text"
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
-                                placeholder="e.g., Cozy Cabin Retreat"
-                                required
-                            />
-                        </div>
+                        {/* Title - Only for Home category */}
+                        {category === "Home" && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Title *
+                                </label>
+                                <input
+                                    type="text"
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                    className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+                                    placeholder="e.g., Cozy Cabin Retreat"
+                                    required
+                                />
+                            </div>
+                        )}
 
                         {/* Rate */}
                         <div>
@@ -711,140 +724,144 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
                             />
                         </div>
 
-                        {/* Basics */}
-                        <div>
-                            <h3 className="text-lg font-semibold text-gray-900 mb-2">Share some basics about your place</h3>
-                            <p className="text-sm text-gray-600 mb-4">You'll add more details later, like bed types.</p>
-                            
-                            <div className="space-y-4">
-                                {/* Guests */}
-                                <div className="flex items-center justify-between py-3 border-b border-gray-200">
-                                    <div>
-                                        <label className="text-base font-medium text-gray-900">Guests</label>
+                        {/* Basics - Only for Home category */}
+                        {category === "Home" && (
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-900 mb-2">Share some basics about your place</h3>
+                                <p className="text-sm text-gray-600 mb-4">You'll add more details later, like bed types.</p>
+                                
+                                <div className="space-y-4">
+                                    {/* Guests */}
+                                    <div className="flex items-center justify-between py-3 border-b border-gray-200">
+                                        <div>
+                                            <label className="text-base font-medium text-gray-900">Guests</label>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <button
+                                                type="button"
+                                                onClick={() => setGuests(Math.max(1, guests - 1))}
+                                                className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <span className="text-gray-600">−</span>
+                                            </button>
+                                            <span className="text-lg font-medium text-gray-900 w-8 text-center">{guests}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setGuests(guests + 1)}
+                                                className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition"
+                                            >
+                                                <span className="text-gray-600">+</span>
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-4">
-                                        <button
-                                            type="button"
-                                            onClick={() => setGuests(Math.max(1, guests - 1))}
-                                            className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            <span className="text-gray-600">−</span>
-                                        </button>
-                                        <span className="text-lg font-medium text-gray-900 w-8 text-center">{guests}</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => setGuests(guests + 1)}
-                                            className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition"
-                                        >
-                                            <span className="text-gray-600">+</span>
-                                        </button>
-                                    </div>
-                                </div>
 
-                                {/* Bedrooms */}
-                                <div className="flex items-center justify-between py-3 border-b border-gray-200">
-                                    <div>
-                                        <label className="text-base font-medium text-gray-900">Bedrooms</label>
+                                    {/* Bedrooms */}
+                                    <div className="flex items-center justify-between py-3 border-b border-gray-200">
+                                        <div>
+                                            <label className="text-base font-medium text-gray-900">Bedrooms</label>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <button
+                                                type="button"
+                                                onClick={() => setBedrooms(Math.max(1, bedrooms - 1))}
+                                                className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <span className="text-gray-600">−</span>
+                                            </button>
+                                            <span className="text-lg font-medium text-gray-900 w-8 text-center">{bedrooms}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setBedrooms(bedrooms + 1)}
+                                                className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition"
+                                            >
+                                                <span className="text-gray-600">+</span>
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-4">
-                                        <button
-                                            type="button"
-                                            onClick={() => setBedrooms(Math.max(1, bedrooms - 1))}
-                                            className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            <span className="text-gray-600">−</span>
-                                        </button>
-                                        <span className="text-lg font-medium text-gray-900 w-8 text-center">{bedrooms}</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => setBedrooms(bedrooms + 1)}
-                                            className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition"
-                                        >
-                                            <span className="text-gray-600">+</span>
-                                        </button>
-                                    </div>
-                                </div>
 
-                                {/* Beds */}
-                                <div className="flex items-center justify-between py-3 border-b border-gray-200">
-                                    <div>
-                                        <label className="text-base font-medium text-gray-900">Beds</label>
+                                    {/* Beds */}
+                                    <div className="flex items-center justify-between py-3 border-b border-gray-200">
+                                        <div>
+                                            <label className="text-base font-medium text-gray-900">Beds</label>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <button
+                                                type="button"
+                                                onClick={() => setBeds(Math.max(1, beds - 1))}
+                                                disabled={beds <= 1}
+                                                className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <span className="text-gray-600">−</span>
+                                            </button>
+                                            <span className="text-lg font-medium text-gray-900 w-8 text-center">{beds}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setBeds(beds + 1)}
+                                                className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition"
+                                            >
+                                                <span className="text-gray-600">+</span>
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-4">
-                                        <button
-                                            type="button"
-                                            onClick={() => setBeds(Math.max(1, beds - 1))}
-                                            disabled={beds <= 1}
-                                            className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            <span className="text-gray-600">−</span>
-                                        </button>
-                                        <span className="text-lg font-medium text-gray-900 w-8 text-center">{beds}</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => setBeds(beds + 1)}
-                                            className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition"
-                                        >
-                                            <span className="text-gray-600">+</span>
-                                        </button>
-                                    </div>
-                                </div>
 
-                                {/* Bathrooms */}
-                                <div className="flex items-center justify-between py-3 border-b border-gray-200">
-                                    <div>
-                                        <label className="text-base font-medium text-gray-900">Bathrooms</label>
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                        <button
-                                            type="button"
-                                            onClick={() => setBathrooms(Math.max(1, bathrooms - 1))}
-                                            className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            <span className="text-gray-600">−</span>
-                                        </button>
-                                        <span className="text-lg font-medium text-gray-900 w-8 text-center">{bathrooms}</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => setBathrooms(bathrooms + 1)}
-                                            className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition"
-                                        >
-                                            <span className="text-gray-600">+</span>
-                                        </button>
+                                    {/* Bathrooms */}
+                                    <div className="flex items-center justify-between py-3 border-b border-gray-200">
+                                        <div>
+                                            <label className="text-base font-medium text-gray-900">Bathrooms</label>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <button
+                                                type="button"
+                                                onClick={() => setBathrooms(Math.max(1, bathrooms - 1))}
+                                                className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <span className="text-gray-600">−</span>
+                                            </button>
+                                            <span className="text-lg font-medium text-gray-900 w-8 text-center">{bathrooms}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setBathrooms(bathrooms + 1)}
+                                                className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition"
+                                            >
+                                                <span className="text-gray-600">+</span>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
 
-                        {/* Amenities */}
-                        <div>
-                            <h3 className="text-lg font-semibold text-gray-900 mb-4">What about these guest favorites?</h3>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                                {basicAmenities.map((amenity) => {
-                                    const Icon = amenity.icon;
-                                    const isSelected = amenities.includes(amenity.id);
-                                    return (
-                                        <button
-                                            key={amenity.id}
-                                            type="button"
-                                            onClick={() => toggleAmenity(amenity.id)}
-                                            className={`p-4 border-2 rounded-lg transition-all duration-200 ${
-                                                isSelected
-                                                    ? "border-blue-600 bg-blue-50"
-                                                    : "border-gray-300 bg-white hover:border-gray-400"
-                                            }`}
-                                        >
-                                            <div className="flex flex-col items-center gap-2">
-                                                <Icon className={`text-2xl ${isSelected ? "text-blue-600" : "text-gray-700"}`} />
-                                                <span className={`text-sm text-center ${isSelected ? "text-blue-700 font-medium" : "text-gray-700"}`}>
-                                                    {amenity.label}
-                                                </span>
-                                            </div>
-                                        </button>
-                                    );
-                                })}
+                        {/* Amenities - Only for Home category */}
+                        {category === "Home" && (
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4">What about these guest favorites?</h3>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                    {basicAmenities.map((amenity) => {
+                                        const Icon = amenity.icon;
+                                        const isSelected = amenities.includes(amenity.id);
+                                        return (
+                                            <button
+                                                key={amenity.id}
+                                                type="button"
+                                                onClick={() => toggleAmenity(amenity.id)}
+                                                className={`p-4 border-2 rounded-lg transition-all duration-200 ${
+                                                    isSelected
+                                                        ? "border-blue-600 bg-blue-50"
+                                                        : "border-gray-300 bg-white hover:border-gray-400"
+                                                }`}
+                                            >
+                                                <div className="flex flex-col items-center gap-2">
+                                                    <Icon className={`text-2xl ${isSelected ? "text-blue-600" : "text-gray-700"}`} />
+                                                    <span className={`text-sm text-center ${isSelected ? "text-blue-700 font-medium" : "text-gray-700"}`}>
+                                                        {amenity.label}
+                                                    </span>
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Action Buttons */}
                         <div className="flex gap-4 pt-4 border-t border-gray-200">
