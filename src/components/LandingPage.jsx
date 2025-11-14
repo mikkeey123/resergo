@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import Loginmodal from "../auth/Loginmodal";
 import LoginForm from "../auth/LoginForm";
-import video from "../assets/showcase.mp4";
+// Video file is not in git (too large >100MB), will use gradient background fallback
+// If you want to use the video, host it on a CDN and update the videoUrl below
+const videoUrl = null; // Set to video URL if hosted elsewhere, or null to use gradient
 import { 
   FaHome, 
   FaShieldAlt, 
@@ -77,16 +79,21 @@ const LandingPage = ({ onNavigateToGuest, onNavigateToHost, onNavigateToAdmin, o
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
       <section id="home" className="relative text-white py-24 md:py-36 lg:py-48 overflow-hidden min-h-[70vh] md:min-h-[75vh]">
-         {/* Video Background */}
-         <video
-           autoPlay
-           loop
-           muted
-           playsInline
-           className="absolute inset-0 w-full h-full object-cover"
-         >
-           <source src={video} type="video/mp4" />
-         </video>
+         {/* Video Background - Only show if videoUrl is set */}
+         {videoUrl ? (
+           <video
+             autoPlay
+             loop
+             muted
+             playsInline
+             className="absolute inset-0 w-full h-full object-cover"
+           >
+             <source src={videoUrl} type="video/mp4" />
+           </video>
+         ) : (
+           /* Gradient Background Fallback */
+           <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800"></div>
+         )}
          
          {/* Overlay for better text readability */}
          <div className="absolute inset-0 bg-black/30"></div>

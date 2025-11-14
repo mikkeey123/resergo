@@ -49,5 +49,5 @@ build
 *.mp4
 *.mov
 *.avi
-# Uncomment the line below if you want to keep showcase.mp4 local but not in git
-# src/assets/showcase.mp4
+# Note: showcase.mp4 is too large for GitHub (>100MB)
+# Use gradient background fallback in LandingPage.jsx
