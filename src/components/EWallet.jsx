@@ -36,25 +36,27 @@ const WithdrawModal = React.memo(({
 
     // Focus amount input ONLY when modal first opens - never refocus after that
     useEffect(() => {
-        if (showWithdrawModal) {
-            // Only focus if we haven't focused yet AND modal just opened
-            if (!hasFocusedOnMount.current && !modalJustOpened.current) {
-                modalJustOpened.current = true;
-                setTimeout(() => {
-                    if (amountInputRef.current && !hasFocusedOnMount.current) {
+        if (showWithdrawModal && !hasFocusedOnMount.current) {
+            // Only focus once when modal opens
+            const timer = setTimeout(() => {
+                // Double-check we haven't focused yet and modal is still open
+                if (amountInputRef.current && showWithdrawModal && !hasFocusedOnMount.current) {
+                    // Only focus if email input is NOT currently focused
+                    if (document.activeElement !== emailInputRef.current) {
                         amountInputRef.current.focus();
                         hasFocusedOnMount.current = true;
                     }
-                }, 100);
-            }
-        } else {
+                }
+            }, 100);
+            
+            return () => clearTimeout(timer);
+        } else if (!showWithdrawModal) {
             // Reset everything when modal closes
             hasFocusedOnMount.current = false;
             isTypingRef.current = false;
-            modalJustOpened.current = false;
             emailValueRef.current = withdrawEmail;
         }
-    }, [showWithdrawModal]); // Only depend on showWithdrawModal
+    }, [showWithdrawModal]); // Only depend on showWithdrawModal - NEVER refocus on email changes
 
     // Handle email input change - use ref to prevent re-renders
     const handleEmailChange = useCallback((e) => {
