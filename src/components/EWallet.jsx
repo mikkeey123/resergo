@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { FaWallet, FaPaypal, FaArrowUp, FaArrowDown, FaHistory, FaTimes, FaCheckCircle } from "react-icons/fa";
 import { auth, getWalletBalance, topUpWallet, withdrawFromWallet, getTransactionHistory } from "../../Config";
 import { onAuthStateChanged } from "firebase/auth";
