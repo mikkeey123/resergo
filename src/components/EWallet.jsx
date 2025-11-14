@@ -48,7 +48,7 @@ const WithdrawModal = React.memo(({
             isTypingRef.current = false;
             emailValueRef.current = withdrawEmail;
         }
-    }, [showWithdrawModal, withdrawEmail]);
+    }, [showWithdrawModal]); // Only depend on showWithdrawModal, not withdrawEmail
 
     // Handle email input change - use ref to prevent re-renders
     const handleEmailChange = useCallback((e) => {
