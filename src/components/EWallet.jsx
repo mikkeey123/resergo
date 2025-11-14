@@ -20,19 +20,6 @@ const WithdrawModal = React.memo(({
     const emailInputRef = useRef(null);
     const amountInputRef = useRef(null);
     const hasFocusedOnMount = useRef(false);
-    const emailValueRef = useRef(withdrawEmail);
-    const isTypingRef = useRef(false);
-    const modalJustOpened = useRef(false);
-
-    // Sync ref with prop value only when not typing
-    useEffect(() => {
-        if (!isTypingRef.current) {
-            emailValueRef.current = withdrawEmail;
-            if (emailInputRef.current) {
-                emailInputRef.current.value = withdrawEmail;
-            }
-        }
-    }, [withdrawEmail]);
 
     // Focus amount input ONLY when modal first opens - never refocus after that
     useEffect(() => {
@@ -53,34 +40,12 @@ const WithdrawModal = React.memo(({
         } else if (!showWithdrawModal) {
             // Reset everything when modal closes
             hasFocusedOnMount.current = false;
-            isTypingRef.current = false;
-            emailValueRef.current = withdrawEmail;
         }
     }, [showWithdrawModal]); // Only depend on showWithdrawModal - NEVER refocus on email changes
 
-    // Handle email input change - use ref to prevent re-renders
+    // Handle email input change - simple handler like amount input
     const handleEmailChange = useCallback((e) => {
-        const input = e.target;
-        const newValue = input.value;
-        
-        // Update ref immediately
-        emailValueRef.current = newValue;
-        isTypingRef.current = true;
-        
-        // Update parent state
-        const syntheticEvent = {
-            target: { value: newValue },
-            currentTarget: input
-        };
-        onEmailChange(syntheticEvent);
-        
-        // Ensure focus stays (email input doesn't support setSelectionRange)
-        requestAnimationFrame(() => {
-            if (input && document.activeElement !== input) {
-                input.focus();
-            }
-            isTypingRef.current = false;
-        });
+        onEmailChange(e);
     }, [onEmailChange]);
 
     if (!showWithdrawModal) return null;
@@ -109,17 +74,7 @@ const WithdrawModal = React.memo(({
                         <FaTimes className="text-xl" />
                     </button>
                 </div>
-                <form onSubmit={(e) => {
-                    e.preventDefault();
-                    // Get current email value from ref (uncontrolled input)
-                    const currentEmail = emailInputRef.current?.value || withdrawEmail;
-                    // Create synthetic event with current email value
-                    const syntheticEvent = {
-                        ...e,
-                        currentEmail: currentEmail
-                    };
-                    onSubmit(syntheticEvent);
-                }} className="p-6 space-y-5">
+                <form onSubmit={onSubmit} className="p-6 space-y-5">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             Amount (₱)
@@ -148,7 +103,7 @@ const WithdrawModal = React.memo(({
                         <input
                             ref={emailInputRef}
                             type="email"
-                            defaultValue={withdrawEmail}
+                            value={withdrawEmail}
                             onChange={handleEmailChange}
                             className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 transition"
                             placeholder="your.email@example.com"
@@ -410,8 +365,8 @@ const EWallet = ({ userId = null }) => {
             return;
         }
 
-        // Get email from event if provided (from uncontrolled input), otherwise use state
-        const emailValue = e.currentEmail || withdrawEmail;
+        // Get email from state (controlled input)
+        const emailValue = withdrawEmail;
         if (!emailValue || !emailValue.includes("@")) {
             alert("Please enter a valid PayPal email address");
             return;
