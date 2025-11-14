@@ -19,7 +19,7 @@ import {
     FaEye,
     FaEdit
 } from "react-icons/fa";
-import { auth, getUserData, getUserType, getAllBookings, getAllReviews, getAllListings, getAllUsers, getAllTransactions, getListing, getWalletBalance } from "../../Config";
+import { auth, getUserData, getUserType, getAllBookings, getAllReviews, getAllListings, getAllUsers, getAllTransactions, getListing, getWalletBalance, saveRulesAndRegulations, getRulesAndRegulations, saveCancellationRules, getCancellationRules } from "../../Config";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import UserDetails from "../components/UserDetails";
 import EWallet from "../components/EWallet";
@@ -149,7 +149,24 @@ const Adminpage = () => {
         if (activeTab === "analytics" || activeTab === "reviews" || activeTab === "bookings" || activeTab === "payments") {
             fetchAdminData();
         }
+        if (activeTab === "policies") {
+            fetchPolicyData();
+        }
     }, [activeTab]);
+
+    // Fetch policy data (rules & regulations, cancellation rules)
+    const fetchPolicyData = async () => {
+        try {
+            const [regulationsData, cancellationRulesData] = await Promise.all([
+                getRulesAndRegulations(),
+                getCancellationRules()
+            ]);
+            setRegulations(regulationsData);
+            setCancellationRules(cancellationRulesData);
+        } catch (error) {
+            console.error("Error fetching policy data:", error);
+        }
+    };
 
     // State for formatted reviews
     const [formattedBestReviews, setFormattedBestReviews] = useState([]);
@@ -763,9 +780,14 @@ const Adminpage = () => {
                                         </div>
                                     )}
                                     <button
-                                        onClick={() => {
-                                            // Save cancellation rules (would save to Firestore in production)
-                                            alert("Cancellation rules saved!");
+                                        onClick={async () => {
+                                            try {
+                                                await saveCancellationRules(cancellationRules);
+                                                alert("Cancellation rules saved successfully!");
+                                            } catch (error) {
+                                                console.error("Error saving cancellation rules:", error);
+                                                alert("Failed to save cancellation rules. Please try again.");
+                                            }
                                         }}
                                         className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                                     >
@@ -784,9 +806,14 @@ const Adminpage = () => {
                                     className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[200px]"
                                 />
                                 <button
-                                    onClick={() => {
-                                        // Save regulations (would save to Firestore in production)
-                                        alert("Rules & regulations saved!");
+                                    onClick={async () => {
+                                        try {
+                                            await saveRulesAndRegulations(regulations);
+                                            alert("Rules & regulations saved successfully!");
+                                        } catch (error) {
+                                            console.error("Error saving rules & regulations:", error);
+                                            alert("Failed to save rules & regulations. Please try again.");
+                                        }
                                     }}
                                     className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                                 >

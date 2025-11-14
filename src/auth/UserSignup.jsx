@@ -3,6 +3,7 @@ import { saveGoogleUserData, auth, googleProvider } from "../../Config";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, linkWithCredential, signOut, GoogleAuthProvider, EmailAuthProvider } from "firebase/auth";
 import AlertPopup from "../components/AlertPopup";
 import { compressImage } from "../utils/imageCompression";
+import RulesModal from "../components/RulesModal";
 
 const UserSignup = ({ title = "Sign Up", loginType = "guest", onNavigateToGuest, onNavigateToHost, onClose, onSwitchToLogin, onGoogleSignIn, isGoogleSignup = false, pendingUser = null }) => {
   const [username, setUsername] = useState("");
@@ -13,6 +14,8 @@ const UserSignup = ({ title = "Sign Up", loginType = "guest", onNavigateToGuest,
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [acceptedRules, setAcceptedRules] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
 
   // Auto-hide alerts after 2.5 seconds
   useEffect(() => {
@@ -60,6 +63,13 @@ const UserSignup = ({ title = "Sign Up", loginType = "guest", onNavigateToGuest,
     // Validate profile picture is required
     if (!profilePicture) {
       setError("Profile picture is required");
+      setLoading(false);
+      return;
+    }
+    
+    // Validate rules acceptance
+    if (!acceptedRules) {
+      setError("Please accept the Rules & Regulations to continue.");
       setLoading(false);
       return;
     }
@@ -380,11 +390,34 @@ const UserSignup = ({ title = "Sign Up", loginType = "guest", onNavigateToGuest,
           </div>
         </div>
 
+        {/* Rules & Regulations Checkbox */}
+        <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <input
+            type="checkbox"
+            id="acceptRulesSignup"
+            checked={acceptedRules}
+            onChange={(e) => setAcceptedRules(e.target.checked)}
+            className="mt-1 w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+            required
+          />
+          <label htmlFor="acceptRulesSignup" className="flex-1 text-sm text-gray-700 cursor-pointer">
+            I have read and agree to the{" "}
+            <button
+              type="button"
+              onClick={() => setShowRulesModal(true)}
+              className="text-indigo-600 hover:underline font-medium"
+            >
+              Rules & Regulations
+            </button>
+            <span className="text-red-500"> *</span>
+          </label>
+        </div>
+
         {/* Sign up button */}
         <button
           type="submit"
-          disabled={loading}
-          className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-50"
+          disabled={loading || !acceptedRules}
+          className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? "Saving..." : isGoogleSignup ? "Complete Account" : "Sign up"}
         </button>
@@ -405,6 +438,9 @@ const UserSignup = ({ title = "Sign Up", loginType = "guest", onNavigateToGuest,
           </p>
         </div>
       )}
+
+      {/* Rules & Regulations Modal */}
+      <RulesModal isOpen={showRulesModal} onClose={() => setShowRulesModal(false)} />
     </div>
   );
 };

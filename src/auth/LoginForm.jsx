@@ -3,6 +3,7 @@ import UserSignup from "./UserSignup";
 import { handleGoogleSignup, auth, getUserType, updateUserType } from "../../Config";
 import { signOut, signInWithEmailAndPassword } from "firebase/auth";
 import AlertPopup from "../components/AlertPopup";
+import RulesModal from "../components/RulesModal";
 
 const LoginForm = ({ title = "Login", loginType = "guest", onNavigateToGuest, onNavigateToHost, onNavigateToAdmin, onNavigateToHome, onClose, onGoogleSignIn, showSignup = false, onSwitchToSignup }) => {
   const [email, setEmail] = useState("");
@@ -10,6 +11,8 @@ const LoginForm = ({ title = "Login", loginType = "guest", onNavigateToGuest, on
   const [isSignup, setIsSignup] = useState(showSignup);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [acceptedRules, setAcceptedRules] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
 
   // Auto-hide alerts after 2.5 seconds
   useEffect(() => {
@@ -57,6 +60,12 @@ const LoginForm = ({ title = "Login", loginType = "guest", onNavigateToGuest, on
     // Validate inputs
     if (!email || !password) {
       setError("Please enter both email and password.");
+      return;
+    }
+    
+    // Validate rules acceptance
+    if (!acceptedRules) {
+      setError("Please accept the Rules & Regulations to continue.");
       return;
     }
     
@@ -150,6 +159,12 @@ const LoginForm = ({ title = "Login", loginType = "guest", onNavigateToGuest, on
   const handleGoogleLogin = async () => {
     console.log("LoginForm handleGoogleLogin - loginType:", loginType);
     setError("");
+    
+    // Validate rules acceptance
+    if (!acceptedRules) {
+      setError("Please accept the Rules & Regulations to continue.");
+      return;
+    }
     
     try {
       // Call handleGoogleSignup for authentication
@@ -335,10 +350,34 @@ const LoginForm = ({ title = "Login", loginType = "guest", onNavigateToGuest, on
           </a>
         </div>
 
+        {/* Rules & Regulations Checkbox */}
+        <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <input
+            type="checkbox"
+            id="acceptRules"
+            checked={acceptedRules}
+            onChange={(e) => setAcceptedRules(e.target.checked)}
+            className="mt-1 w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+            required
+          />
+          <label htmlFor="acceptRules" className="flex-1 text-sm text-gray-700 cursor-pointer">
+            I have read and agree to the{" "}
+            <button
+              type="button"
+              onClick={() => setShowRulesModal(true)}
+              className="text-indigo-600 hover:underline font-medium"
+            >
+              Rules & Regulations
+            </button>
+            <span className="text-red-500"> *</span>
+          </label>
+        </div>
+
         {/* Sign in button */}
         <button
           type="submit"
-          className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition"
+          disabled={!acceptedRules}
+          className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Sign in
         </button>
@@ -356,7 +395,8 @@ const LoginForm = ({ title = "Login", loginType = "guest", onNavigateToGuest, on
         <button
           type="button"
           onClick={handleGoogleLogin}
-          className="flex items-center justify-center w-full py-3 px-4 border border-gray-300 rounded-lg text-black hover:bg-gray-50 transition duration-200"
+          disabled={!acceptedRules}
+          className="flex items-center justify-center w-full py-3 px-4 border border-gray-300 rounded-lg text-black hover:bg-gray-50 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -367,6 +407,9 @@ const LoginForm = ({ title = "Login", loginType = "guest", onNavigateToGuest, on
           Google
         </button>
       </div>
+
+      {/* Rules & Regulations Modal */}
+      <RulesModal isOpen={showRulesModal} onClose={() => setShowRulesModal(false)} />
     </div>
   );
 };

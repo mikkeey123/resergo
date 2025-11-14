@@ -2445,4 +2445,78 @@ export const getAllTransactions = async () => {
     }
 };
 
+// Save Rules & Regulations (Admin only)
+export const saveRulesAndRegulations = async (regulations) => {
+    try {
+        const rulesRef = doc(db, "platformSettings", "rulesAndRegulations");
+        await setDoc(rulesRef, {
+            regulations: regulations,
+            updatedAt: serverTimestamp()
+        }, { merge: true });
+        console.log("Rules & Regulations saved successfully");
+        return true;
+    } catch (error) {
+        console.error("Error saving rules & regulations:", error);
+        throw error;
+    }
+};
+
+// Get Rules & Regulations
+export const getRulesAndRegulations = async () => {
+    try {
+        const rulesRef = doc(db, "platformSettings", "rulesAndRegulations");
+        const rulesDoc = await getDoc(rulesRef);
+        
+        if (rulesDoc.exists()) {
+            return rulesDoc.data().regulations || "";
+        }
+        return "";
+    } catch (error) {
+        console.error("Error fetching rules & regulations:", error);
+        return "";
+    }
+};
+
+// Save Cancellation Rules (Admin only)
+export const saveCancellationRules = async (cancellationRules) => {
+    try {
+        const rulesRef = doc(db, "platformSettings", "cancellationRules");
+        await setDoc(rulesRef, {
+            ...cancellationRules,
+            updatedAt: serverTimestamp()
+        }, { merge: true });
+        console.log("Cancellation rules saved successfully");
+        return true;
+    } catch (error) {
+        console.error("Error saving cancellation rules:", error);
+        throw error;
+    }
+};
+
+// Get Cancellation Rules
+export const getCancellationRules = async () => {
+    try {
+        const rulesRef = doc(db, "platformSettings", "cancellationRules");
+        const rulesDoc = await getDoc(rulesRef);
+        
+        if (rulesDoc.exists()) {
+            return rulesDoc.data();
+        }
+        return {
+            freeCancellation: true,
+            freeCancellationDays: 7,
+            partialRefundDays: 3,
+            noRefundDays: 1
+        };
+    } catch (error) {
+        console.error("Error fetching cancellation rules:", error);
+        return {
+            freeCancellation: true,
+            freeCancellationDays: 7,
+            partialRefundDays: 3,
+            noRefundDays: 1
+        };
+    }
+};
+
 export { auth, db, googleProvider, handleGoogleSignup, checkUserExists, checkAccountComplete, saveGoogleUserData, saveAdminUserData, saveHostUserData, getUserData, getUserType, updatePasswordInFirestore, verifyPassword, updateProfilePicture, updateUserProfile, updateUserType, linkEmailPasswordToGoogleAccount, saveListing, updateListing, getListing, deleteListing, getHostListings, getPublishedListings, saveReview, getListingReviews, updateListingRating, updateReview };
