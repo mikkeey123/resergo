@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { auth, saveListing, updateListing } from "../../Config";
-import { FaPlus, FaTrash, FaSave, FaTimes, FaCamera, FaImages, FaWifi, FaTv, FaUtensils, FaTshirt, FaCar, FaDollarSign, FaSnowflake, FaLaptop } from "react-icons/fa";
+import { FaPlus, FaTrash, FaSave, FaTimes, FaCamera, FaImages, FaWifi, FaTv, FaUtensils, FaTshirt, FaCar, FaDollarSign, FaSnowflake, FaLaptop, FaClock, FaUsers, FaMapMarkerAlt, FaCheckCircle, FaExclamationTriangle } from "react-icons/fa";
 import LocationMap from "./components/LocationMap";
 import AlertPopup from "../components/AlertPopup";
 import { compressImages } from "../utils/imageCompression";
@@ -18,11 +18,27 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
     const [latitude, setLatitude] = useState("");
     const [longitude, setLongitude] = useState("");
     const [description, setDescription] = useState("");
+    
+    // Home-specific fields
     const [guests, setGuests] = useState(1);
     const [bedrooms, setBedrooms] = useState(1);
     const [beds, setBeds] = useState(1);
     const [bathrooms, setBathrooms] = useState(1);
     const [amenities, setAmenities] = useState([]);
+    
+    // Experience-specific fields
+    const [duration, setDuration] = useState(""); // Duration in hours
+    const [groupSize, setGroupSize] = useState(1); // Max participants
+    const [whatsIncluded, setWhatsIncluded] = useState(""); // What's included in the experience
+    const [meetingPoint, setMeetingPoint] = useState(""); // Meeting point address
+    const [requirements, setRequirements] = useState(""); // Requirements for guests
+    
+    // Service-specific fields
+    const [serviceType, setServiceType] = useState(""); // Type of service (e.g., "Cleaning", "Photography", "Catering")
+    const [serviceDuration, setServiceDuration] = useState(""); // Duration of service
+    const [serviceIncludes, setServiceIncludes] = useState(""); // What's included
+    const [serviceRequirements, setServiceRequirements] = useState(""); // Requirements
+    
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
@@ -78,11 +94,26 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
             setLatitude(editingListing.location?.latitude?.toString() || "");
             setLongitude(editingListing.location?.longitude?.toString() || "");
             setDescription(editingListing.description || "");
+            
+            // Home-specific fields
             setGuests(editingListing.basics?.guests || 1);
             setBedrooms(editingListing.basics?.bedrooms || 1);
             setBeds(editingListing.basics?.beds || 1);
             setBathrooms(editingListing.basics?.bathrooms || 1);
             setAmenities(editingListing.amenities || []);
+            
+            // Experience-specific fields
+            setDuration(editingListing.duration?.toString() || "");
+            setGroupSize(editingListing.groupSize || 1);
+            setWhatsIncluded(editingListing.whatsIncluded || "");
+            setMeetingPoint(editingListing.meetingPoint || "");
+            setRequirements(editingListing.requirements || "");
+            
+            // Service-specific fields
+            setServiceType(editingListing.serviceType || "");
+            setServiceDuration(editingListing.serviceDuration?.toString() || "");
+            setServiceIncludes(editingListing.serviceIncludes || "");
+            setServiceRequirements(editingListing.serviceRequirements || "");
         } else if (!editingListing && isOpen) {
             // Reset form when opening for new listing
             setCategory("Home");
@@ -99,6 +130,15 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
             setBeds(1);
             setBathrooms(1);
             setAmenities([]);
+            setDuration("");
+            setGroupSize(1);
+            setWhatsIncluded("");
+            setMeetingPoint("");
+            setRequirements("");
+            setServiceType("");
+            setServiceDuration("");
+            setServiceIncludes("");
+            setServiceRequirements("");
             setError("");
             setSuccess("");
         }
@@ -227,6 +267,15 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
         setBeds(1);
         setBathrooms(1);
         setAmenities([]);
+        setDuration("");
+        setGroupSize(1);
+        setWhatsIncluded("");
+        setMeetingPoint("");
+        setRequirements("");
+        setServiceType("");
+        setServiceDuration("");
+        setServiceIncludes("");
+        setServiceRequirements("");
         setError("");
         setSuccess("");
     };
@@ -246,6 +295,7 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
 
             const listingData = {
                 category,
+                title, // Title is now required for all categories
                 rate: parseFloat(rate) || 0,
                 images,
                 location: {
@@ -258,9 +308,8 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
                 availability: {}
             };
 
-            // Only include title, basics, and amenities for Home category
+            // Category-specific fields
             if (category === "Home") {
-                listingData.title = title;
                 listingData.basics = {
                     guests,
                     bedrooms,
@@ -268,6 +317,17 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
                     bathrooms
                 };
                 listingData.amenities = amenities;
+            } else if (category === "Experience") {
+                listingData.duration = parseFloat(duration) || 0;
+                listingData.groupSize = groupSize;
+                listingData.whatsIncluded = whatsIncluded;
+                listingData.meetingPoint = meetingPoint;
+                listingData.requirements = requirements;
+            } else if (category === "Service") {
+                listingData.serviceType = serviceType;
+                listingData.serviceDuration = serviceDuration;
+                listingData.serviceIncludes = serviceIncludes;
+                listingData.serviceRequirements = serviceRequirements;
             }
 
             if (editingListing) {
@@ -301,11 +361,30 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
         setLoading(true);
 
         // Validation
-        // Title only required for Home category
-        if (category === "Home" && !title.trim()) {
+        if (!title.trim()) {
             setError("Title is required");
             setLoading(false);
             return;
+        }
+        
+        // Category-specific validation
+        if (category === "Experience") {
+            if (!duration || parseFloat(duration) <= 0) {
+                setError("Duration is required and must be greater than 0");
+                setLoading(false);
+                return;
+            }
+            if (groupSize < 1) {
+                setError("Group size must be at least 1");
+                setLoading(false);
+                return;
+            }
+        } else if (category === "Service") {
+            if (!serviceType.trim()) {
+                setError("Service type is required");
+                setLoading(false);
+                return;
+            }
         }
         if (!rate || parseFloat(rate) <= 0) {
             setError("Rate must be greater than 0");
@@ -336,6 +415,7 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
 
             const listingData = {
                 category,
+                title, // Title is now required for all categories
                 rate: parseFloat(rate) || 0,
                 images,
                 location: {
@@ -348,9 +428,8 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
                 availability: {}
             };
 
-            // Only include title, basics, and amenities for Home category
+            // Category-specific fields
             if (category === "Home") {
-                listingData.title = title;
                 listingData.basics = {
                     guests,
                     bedrooms,
@@ -358,6 +437,17 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
                     bathrooms
                 };
                 listingData.amenities = amenities;
+            } else if (category === "Experience") {
+                listingData.duration = parseFloat(duration) || 0;
+                listingData.groupSize = groupSize;
+                listingData.whatsIncluded = whatsIncluded;
+                listingData.meetingPoint = meetingPoint;
+                listingData.requirements = requirements;
+            } else if (category === "Service") {
+                listingData.serviceType = serviceType;
+                listingData.serviceDuration = serviceDuration;
+                listingData.serviceIncludes = serviceIncludes;
+                listingData.serviceRequirements = serviceRequirements;
             }
 
             if (editingListing) {
@@ -586,22 +676,24 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
                             )}
                         </div>
 
-                        {/* Title - Only for Home category */}
-                        {category === "Home" && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Title *
-                                </label>
-                                <input
-                                    type="text"
-                                    value={title}
-                                    onChange={(e) => setTitle(e.target.value)}
-                                    className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
-                                    placeholder="e.g., Cozy Cabin Retreat"
-                                    required
-                                />
-                            </div>
-                        )}
+                        {/* Title - Required for all categories */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Title *
+                            </label>
+                            <input
+                                type="text"
+                                value={title}
+                                onChange={(e) => setTitle(e.target.value)}
+                                className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+                                placeholder={
+                                    category === "Home" ? "e.g., Cozy Cabin Retreat" :
+                                    category === "Experience" ? "e.g., Sunset Photography Tour" :
+                                    "e.g., Professional Cleaning Service"
+                                }
+                                required
+                            />
+                        </div>
 
                         {/* Rate */}
                         <div>
@@ -719,10 +811,194 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
                                 onChange={(e) => setDescription(e.target.value)}
                                 className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
                                 rows="4"
-                                placeholder="Describe your listing..."
+                                placeholder={
+                                    category === "Home" ? "Describe your place..." :
+                                    category === "Experience" ? "Describe your experience..." :
+                                    "Describe your service..."
+                                }
                                 required
                             />
                         </div>
+
+                        {/* Experience-specific fields */}
+                        {category === "Experience" && (
+                            <div className="space-y-6">
+                                <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                                        <FaClock className="text-blue-600" />
+                                        Experience Details
+                                    </h3>
+                                    
+                                    {/* Duration */}
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Duration (hours) *
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={duration}
+                                            onChange={(e) => setDuration(e.target.value)}
+                                            className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+                                            placeholder="e.g., 3"
+                                            min="0.5"
+                                            step="0.5"
+                                            required
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">How long does the experience last?</p>
+                                    </div>
+
+                                    {/* Group Size */}
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                                            <FaUsers className="text-blue-600" />
+                                            Maximum Group Size *
+                                        </label>
+                                        <div className="flex items-center gap-4">
+                                            <button
+                                                type="button"
+                                                onClick={() => setGroupSize(Math.max(1, groupSize - 1))}
+                                                className="w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition"
+                                            >
+                                                <span className="text-gray-600">−</span>
+                                            </button>
+                                            <span className="text-lg font-medium text-gray-900 w-12 text-center">{groupSize}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setGroupSize(groupSize + 1)}
+                                                className="w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition"
+                                            >
+                                                <span className="text-gray-600">+</span>
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-1">Maximum number of participants</p>
+                                    </div>
+
+                                    {/* What's Included */}
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                                            <FaCheckCircle className="text-green-600" />
+                                            What's Included
+                                        </label>
+                                        <textarea
+                                            value={whatsIncluded}
+                                            onChange={(e) => setWhatsIncluded(e.target.value)}
+                                            className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+                                            rows="3"
+                                            placeholder="e.g., Professional guide, Equipment, Snacks, Transportation"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">List what guests will receive or experience</p>
+                                    </div>
+
+                                    {/* Meeting Point */}
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                                            <FaMapMarkerAlt className="text-red-600" />
+                                            Meeting Point
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={meetingPoint}
+                                            onChange={(e) => setMeetingPoint(e.target.value)}
+                                            className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+                                            placeholder="e.g., Main entrance of the park, Hotel lobby"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Where should guests meet you?</p>
+                                    </div>
+
+                                    {/* Requirements */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                                            <FaExclamationTriangle className="text-yellow-600" />
+                                            Requirements
+                                        </label>
+                                        <textarea
+                                            value={requirements}
+                                            onChange={(e) => setRequirements(e.target.value)}
+                                            className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+                                            rows="3"
+                                            placeholder="e.g., Comfortable walking shoes, Age 18+, Physical fitness required"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Any special requirements or restrictions?</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Service-specific fields */}
+                        {category === "Service" && (
+                            <div className="space-y-6">
+                                <div className="bg-purple-50 border-l-4 border-purple-500 p-4 rounded">
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                                        <FaCheckCircle className="text-purple-600" />
+                                        Service Details
+                                    </h3>
+                                    
+                                    {/* Service Type */}
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Service Type *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={serviceType}
+                                            onChange={(e) => setServiceType(e.target.value)}
+                                            className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+                                            placeholder="e.g., Cleaning, Photography, Catering, Tutoring"
+                                            required
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">What type of service are you offering?</p>
+                                    </div>
+
+                                    {/* Service Duration */}
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                                            <FaClock className="text-purple-600" />
+                                            Service Duration
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={serviceDuration}
+                                            onChange={(e) => setServiceDuration(e.target.value)}
+                                            className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+                                            placeholder="e.g., 2 hours, Full day, Per session"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">How long does the service take?</p>
+                                    </div>
+
+                                    {/* What's Included */}
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                                            <FaCheckCircle className="text-green-600" />
+                                            What's Included
+                                        </label>
+                                        <textarea
+                                            value={serviceIncludes}
+                                            onChange={(e) => setServiceIncludes(e.target.value)}
+                                            className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+                                            rows="3"
+                                            placeholder="e.g., All cleaning supplies, Professional equipment, Insurance coverage"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">What does your service include?</p>
+                                    </div>
+
+                                    {/* Requirements */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+                                            <FaExclamationTriangle className="text-yellow-600" />
+                                            Requirements
+                                        </label>
+                                        <textarea
+                                            value={serviceRequirements}
+                                            onChange={(e) => setServiceRequirements(e.target.value)}
+                                            className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+                                            rows="3"
+                                            placeholder="e.g., Access to workspace, Advance booking required, Specific materials needed"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">Any requirements from the client?</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Basics - Only for Home category */}
                         {category === "Home" && (
