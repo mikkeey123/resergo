@@ -46,8 +46,8 @@ build
 *.tsbuildinfo
 
 # Large media files (host elsewhere)
-*.mp4
-*.mov
-*.avi
-# Note: showcase.mp4 is too large for GitHub (>100MB)
-# Use gradient background fallback in LandingPage.jsx
+# *.mp4
+# *.mov
+# *.avi
+# Allow showcase.mp4 (under 100MB)
+!src/assets/showcase.mp4
