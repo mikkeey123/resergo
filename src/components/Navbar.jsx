@@ -307,8 +307,17 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
                         </div>
                     </>
                 ) : currentPage !== "host" ? (
-                    <div className="hidden md:flex absolute left-1/2 transform -translate-x-1/2 max-w-[90vw]">
-                        <div className="flex items-center bg-white rounded-full border border-gray-200 shadow-md hover:shadow-lg transition duration-200">
+                    <>
+                        {/* Mobile Search Button */}
+                        <button
+                            onClick={() => setShowSearchFilter(true)}
+                            className="md:hidden ml-auto mr-2 p-2 bg-blue-600 rounded-full text-white hover:bg-blue-700 transition"
+                        >
+                            <FaSearch className="text-sm" />
+                        </button>
+                        {/* Desktop Search Bar */}
+                        <div className="hidden md:flex absolute left-1/2 transform -translate-x-1/2 max-w-[90vw]">
+                            <div className="flex items-center bg-white rounded-full border border-gray-200 shadow-md hover:shadow-lg transition duration-200">
                             
                             {/* Search Destination */}
                             <button 
@@ -372,6 +381,7 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
                             </button>
                         </div>
                     </div>
+                    </>
                 ) : null}
 
 

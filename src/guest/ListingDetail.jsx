@@ -837,10 +837,10 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
         {/* Photo Gallery Section */}
         <div className="mb-12">
           {listingData.photos && listingData.photos.length > 0 && listingData.photos.some(photo => photo && !photo.includes('No Image') && !photo.includes('fill=\'%23f3f4f6\'')) ? (
-            <div className="grid grid-cols-4 grid-rows-2 gap-2 h-[500px] md:h-[600px] rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-4 sm:grid-rows-2 gap-2 h-[300px] sm:h-[400px] md:h-[500px] lg:h-[600px] rounded-xl overflow-hidden border border-gray-200 shadow-sm">
               {/* Main Photo */}
               <div 
-                className="col-span-2 row-span-2 cursor-pointer relative group overflow-hidden bg-white"
+                className="sm:col-span-2 sm:row-span-2 cursor-pointer relative group overflow-hidden bg-white"
                 onClick={() => setShowAllPhotos(true)}
               >
                 {(() => {
@@ -961,13 +961,13 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-8">
           {/* Main Content */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 order-2 lg:order-1">
             {/* Host Information */}
-            <div className="border border-gray-200 rounded-xl p-6 mb-8 bg-white shadow-sm">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-4 flex-1">
+            <div className="border border-gray-200 rounded-xl p-4 md:p-6 mb-8 bg-white shadow-sm">
+              <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+                <div className="flex items-start gap-3 md:gap-4 flex-1">
                   <img
                     src={listingData.host.avatar || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' fill='%23e5e7eb'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='14' fill='%239ca3af'%3EHost%3C/text%3E%3C/svg%3E"}
                     alt={listingData.host.name || "Host"}
@@ -1003,7 +1003,7 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
                   </div>
                 </div>
                 <button 
-                  className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md whitespace-nowrap"
+                  className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 md:px-5 py-2 md:py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md whitespace-nowrap"
                   onClick={() => {
                     console.log("Chat with host button clicked");
                     console.log("fullListingData:", fullListingData);
@@ -1042,11 +1042,11 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
             </div>
 
             {/* Basics Section */}
-            <div className="border border-gray-200 rounded-xl p-6 mb-8 bg-white shadow-sm">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">
+            <div className="border border-gray-200 rounded-xl p-4 md:p-6 mb-8 bg-white shadow-sm">
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">
                 About this place
               </h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
                 <div className="flex items-center gap-3">
                   <FaUsers className="text-2xl text-blue-600" />
                   <div className="text-lg font-semibold text-gray-900">
@@ -1076,8 +1076,8 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
 
             {/* Amenities Section */}
             {listingData.amenities.length > 0 && (
-              <div className="border border-gray-200 rounded-xl p-6 mb-8 bg-white shadow-sm">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">
+              <div className="border border-gray-200 rounded-xl p-4 md:p-6 mb-8 bg-white shadow-sm">
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">
                   What this place offers
                 </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1100,8 +1100,8 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
             )}
 
             {/* Location Section */}
-            <div className="border border-gray-200 rounded-xl p-6 mb-8 bg-white shadow-sm">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">
+            <div className="border border-gray-200 rounded-xl p-4 md:p-6 mb-8 bg-white shadow-sm">
+              <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">
                 Where you'll be
               </h2>
               <div className="mb-4">
@@ -1399,8 +1399,8 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
           </div>
 
           {/* Booking Widget */}
-          <div className="lg:col-span-1">
-            <div className="sticky top-20 border border-gray-200 rounded-xl p-6 shadow-md bg-white">
+          <div className="lg:col-span-1 order-1 lg:order-2">
+            <div className="sticky top-20 border border-gray-200 rounded-xl p-4 md:p-6 shadow-md bg-white">
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-2xl font-bold text-gray-900">

@@ -171,8 +171,20 @@ const Hostpage = () => {
 
     return (
         <div className="flex h-screen bg-gray-100 overflow-hidden">
+            {/* Mobile Overlay */}
+            {sidebarOpen && (
+                <div 
+                    className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+                    onClick={() => setSidebarOpen(false)}
+                />
+            )}
+            
             {/* Sidebar Navigation */}
-            <div className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-white border-r border-gray-200 shadow-sm transition-all duration-300 ease-in-out flex flex-col overflow-hidden`}>
+            <div className={`${
+                sidebarOpen 
+                    ? 'fixed md:relative w-64 z-50 md:z-auto' 
+                    : 'fixed md:relative -translate-x-full md:translate-x-0 w-20 z-50 md:z-auto'
+            } bg-white border-r border-gray-200 shadow-sm transition-all duration-300 ease-in-out flex flex-col overflow-hidden h-full`}>
                 {/* Sidebar Header */}
                 <div 
                     className={`border-b border-gray-200 flex items-center h-16 relative transition-all duration-300 ${
@@ -183,7 +195,7 @@ const Hostpage = () => {
                         className={`flex items-center cursor-pointer transition-all duration-300 ${
                             sidebarOpen ? 'gap-3 flex-1' : 'justify-center w-full'
                         }`}
-                        onClick={() => setSidebarOpen(true)}
+                        onClick={() => !sidebarOpen && setSidebarOpen(true)}
                     >
                         <img src={logo} alt="ReserGo Logo" className="h-8 w-8 flex-shrink-0" />
                         <h2 className={`text-blue-600 font-bold text-lg transition-all duration-300 ease-in-out whitespace-nowrap ${
@@ -279,11 +291,19 @@ const Hostpage = () => {
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
+            <div className="flex-1 flex flex-col overflow-hidden bg-gray-50 w-full md:w-auto">
                 {/* Top Bar */}
-                <div className="bg-white border-b border-gray-200 h-16 px-6 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <h1 className="text-gray-900 text-2xl font-semibold">
+                <div className="bg-white border-b border-gray-200 h-16 px-4 md:px-6 flex items-center justify-between">
+                    <div className="flex items-center gap-2 md:gap-4">
+                        {/* Mobile Menu Button */}
+                        <button
+                            onClick={() => setSidebarOpen(!sidebarOpen)}
+                            className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition"
+                            aria-label="Toggle menu"
+                        >
+                            <FaBars className="text-xl text-gray-700" />
+                        </button>
+                        <h1 className="text-gray-900 text-lg md:text-2xl font-semibold">
                             {activeTab === "dashboard" ? "Overview" : 
                              activeTab === "listings" ? "Listings" :
                              activeTab === "messages" ? "Messages" :
