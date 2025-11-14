@@ -2310,4 +2310,139 @@ export const approveCancelBooking = async (bookingId, hostId) => {
     }
 };
 
-export { auth, db, googleProvider, handleGoogleSignup, checkUserExists, checkAccountComplete, saveGoogleUserData, saveAdminUserData, saveHostUserData, getUserData, getUserType, updatePasswordInFirestore, verifyPassword, updateProfilePicture, updateUserProfile, updateUserType, linkEmailPasswordToGoogleAccount, saveListing, updateListing, getListing, deleteListing, getHostListings, getPublishedListings, saveReview, getListingReviews, updateListingRating, updateReview };
+// ========== ADMIN FUNCTIONS ==========
+
+// Get all bookings (admin only)
+export const getAllBookings = async () => {
+    try {
+        const bookingsQuery = query(collection(db, "bookings"));
+        const querySnapshot = await getDocs(bookingsQuery);
+        const bookings = [];
+        
+        querySnapshot.forEach((doc) => {
+            bookings.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        
+        // Sort by creation date (newest first)
+        bookings.sort((a, b) => {
+            const dateA = a.createdAt?.toMillis() || 0;
+            const dateB = b.createdAt?.toMillis() || 0;
+            return dateB - dateA;
+        });
+        
+        return bookings;
+    } catch (error) {
+        console.error("Error fetching all bookings:", error);
+        throw error;
+    }
+};
+
+// Get all reviews (admin only)
+export const getAllReviews = async () => {
+    try {
+        const reviewsQuery = query(collection(db, "reviews"));
+        const querySnapshot = await getDocs(reviewsQuery);
+        const reviews = [];
+        
+        querySnapshot.forEach((doc) => {
+            reviews.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        
+        // Sort by date (newest first)
+        reviews.sort((a, b) => {
+            const dateA = a.createdAt?.toMillis() || 0;
+            const dateB = b.createdAt?.toMillis() || 0;
+            return dateB - dateA;
+        });
+        
+        return reviews;
+    } catch (error) {
+        console.error("Error fetching all reviews:", error);
+        throw error;
+    }
+};
+
+// Get all listings (admin only)
+export const getAllListings = async () => {
+    try {
+        const listingsQuery = query(collection(db, "listings"));
+        const querySnapshot = await getDocs(listingsQuery);
+        const listings = [];
+        
+        querySnapshot.forEach((doc) => {
+            listings.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        
+        // Sort by creation date (newest first)
+        listings.sort((a, b) => {
+            const dateA = a.createdAt?.toMillis() || 0;
+            const dateB = b.createdAt?.toMillis() || 0;
+            return dateB - dateA;
+        });
+        
+        return listings;
+    } catch (error) {
+        console.error("Error fetching all listings:", error);
+        throw error;
+    }
+};
+
+// Get all users (admin only)
+export const getAllUsers = async () => {
+    try {
+        const usersQuery = query(collection(db, "Resergodb"));
+        const querySnapshot = await getDocs(usersQuery);
+        const users = [];
+        
+        querySnapshot.forEach((doc) => {
+            users.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        
+        return users;
+    } catch (error) {
+        console.error("Error fetching all users:", error);
+        throw error;
+    }
+};
+
+// Get all transactions (admin only)
+export const getAllTransactions = async () => {
+    try {
+        const transactionsQuery = query(collection(db, "transactions"));
+        const querySnapshot = await getDocs(transactionsQuery);
+        const transactions = [];
+        
+        querySnapshot.forEach((doc) => {
+            transactions.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        
+        // Sort by date (newest first)
+        transactions.sort((a, b) => {
+            const dateA = a.timestamp?.toMillis() || 0;
+            const dateB = b.timestamp?.toMillis() || 0;
+            return dateB - dateA;
+        });
+        
+        return transactions;
+    } catch (error) {
+        console.error("Error fetching all transactions:", error);
+        throw error;
+    }
+};
+
+export { auth, db, googleProvider, handleGoogleSignup, checkUserExists, checkAccountComplete, saveGoogleUserData, saveAdminUserData, saveHostUserData, getUserData, getUserType, updatePasswordInFirestore, verifyPassword, updateProfilePicture, updateUserProfile, updateUserType, linkEmailPasswordToGoogleAccount, saveListing, updateListing, getListing, deleteListing, getHostListings, getPublishedListings, saveReview, getListingReviews, updateListingRating, updateReview, getAllBookings, getAllReviews, getAllListings, getAllUsers, getAllTransactions, getWalletBalance };
