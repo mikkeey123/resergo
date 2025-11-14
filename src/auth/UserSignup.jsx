@@ -283,7 +283,7 @@ const UserSignup = ({ title = "Sign Up", loginType = "guest", onNavigateToGuest,
   };
 
   return (
-    <div className="w-full max-w-4xl px-10 py-10 bg-white shadow-lg rounded-2xl border border-gray-100 mx-auto">
+    <div className="w-full max-w-4xl px-4 sm:px-6 md:px-10 py-6 sm:py-8 md:py-10 bg-white shadow-lg rounded-2xl border border-gray-100 mx-auto">
       {/* Title */}
       <h2 className="text-3xl font-bold mb-6 text-center text-gray-800">
         {title}
