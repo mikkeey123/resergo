@@ -146,8 +146,8 @@ service cloud.firestore {
     
     // Platform Settings collection (for Rules & Regulations and Cancellation Rules)
     match /platformSettings/{documentId} {
-      // Allow anyone to read (needed for login/signup modal before authentication)
-      allow read: if true;
+      // Allow all authenticated users to read (needed for login/signup modal)
+      allow read: if isAuthenticated();
       // Only admins can create, update, or delete
       allow create: if isAdmin();
       allow update: if isAdmin();
