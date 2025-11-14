@@ -5,6 +5,120 @@ import { onAuthStateChanged } from "firebase/auth";
 import { PayPalScriptProvider, PayPalButtons, usePayPalScriptReducer } from "@paypal/react-paypal-js";
 import { PAYPAL_CONFIG, paypalSdkOptions, isPayPalConfigured } from "../config/paypal";
 
+// Withdraw Modal Component - Memoized to prevent re-renders
+const WithdrawModal = React.memo(({ 
+    showWithdrawModal, 
+    withdrawAmount, 
+    withdrawEmail, 
+    balance, 
+    processing, 
+    onClose, 
+    onAmountChange, 
+    onEmailChange, 
+    onSubmit 
+}) => {
+    const emailInputRef = useRef(null);
+
+    // Focus email input when modal opens
+    useEffect(() => {
+        if (showWithdrawModal && emailInputRef.current) {
+            setTimeout(() => {
+                emailInputRef.current?.focus();
+            }, 100);
+        }
+    }, [showWithdrawModal]);
+
+    if (!showWithdrawModal) return null;
+
+    return (
+        <div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={() => !processing && onClose()}
+        >
+            <div 
+                className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-gray-200"
+                onClick={(e) => e.stopPropagation()}
+            >
+                <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-100 rounded-lg">
+                            <FaPaypal className="text-blue-600 text-xl" />
+                        </div>
+                        <h2 className="text-xl font-bold text-gray-900">Withdraw to PayPal</h2>
+                    </div>
+                    <button
+                        onClick={() => !processing && onClose()}
+                        className="text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-gray-100"
+                        disabled={processing}
+                    >
+                        <FaTimes className="text-xl" />
+                    </button>
+                </div>
+                <form onSubmit={onSubmit} className="p-6 space-y-5">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Amount (₱)
+                        </label>
+                        <input
+                            type="number"
+                            value={withdrawAmount}
+                            onChange={onAmountChange}
+                            className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 transition"
+                            placeholder="Enter amount"
+                            min="1"
+                            step="0.01"
+                            max={balance}
+                            required
+                            disabled={processing}
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                            Available: ₱{balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            PayPal Email Address *
+                        </label>
+                        <input
+                            ref={emailInputRef}
+                            type="email"
+                            value={withdrawEmail}
+                            onChange={onEmailChange}
+                            className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 transition"
+                            placeholder="your.email@example.com"
+                            required
+                            disabled={processing}
+                            autoComplete="email"
+                        />
+                    </div>
+                    <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
+                        <p className="text-sm text-yellow-800">
+                            <strong>Processing Time:</strong> Withdrawals are typically processed within 1-3 business days.
+                        </p>
+                    </div>
+                    <div className="flex gap-4 pt-4 border-t border-gray-200">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="flex-1 px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition font-medium"
+                            disabled={processing}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md hover:shadow-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={processing}
+                        >
+                            {processing ? "Processing..." : "Submit Withdrawal"}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+});
+
 // PayPal Button Wrapper Component - Memoized to prevent re-renders on input changes
 const PayPalButtonWrapper = React.memo(({ amount, onSuccess, onError, onCancel, disabled }) => {
     const [{ isPending }] = usePayPalScriptReducer();
@@ -96,7 +210,6 @@ const EWallet = ({ userId = null }) => {
     const [currentUserId, setCurrentUserId] = useState(null);
     const [paypalError, setPaypalError] = useState("");
     const [debouncedAmount, setDebouncedAmount] = useState("");
-    const withdrawEmailInputRef = useRef(null);
 
     // Get current user
     useEffect(() => {
@@ -210,15 +323,18 @@ const EWallet = ({ userId = null }) => {
         // PayPal button will handle the rest
     };
 
-    // Focus email input when withdraw modal opens
-    useEffect(() => {
-        if (showWithdrawModal && withdrawEmailInputRef.current) {
-            // Small delay to ensure modal is fully rendered
-            setTimeout(() => {
-                withdrawEmailInputRef.current?.focus();
-            }, 100);
-        }
-    }, [showWithdrawModal]);
+    // Memoize handlers to prevent unnecessary re-renders
+    const handleWithdrawAmountChange = useCallback((e) => {
+        setWithdrawAmount(e.target.value);
+    }, []);
+
+    const handleWithdrawEmailChange = useCallback((e) => {
+        setWithdrawEmail(e.target.value);
+    }, []);
+
+    const handleWithdrawClose = useCallback(() => {
+        setShowWithdrawModal(false);
+    }, []);
 
     // Handle withdrawal
     const handleWithdraw = async (e) => {
@@ -508,95 +624,17 @@ const EWallet = ({ userId = null }) => {
                 )}
 
                 {/* Withdraw Modal */}
-                {showWithdrawModal && (
-                    <div 
-                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-                        onClick={() => !processing && setShowWithdrawModal(false)}
-                    >
-                        <div 
-                            className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-gray-200"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-blue-100 rounded-lg">
-                                        <FaPaypal className="text-blue-600 text-xl" />
-                                    </div>
-                                    <h2 className="text-xl font-bold text-gray-900">Withdraw to PayPal</h2>
-                                </div>
-                                <button
-                                    onClick={() => !processing && setShowWithdrawModal(false)}
-                                    className="text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-gray-100"
-                                    disabled={processing}
-                                >
-                                    <FaTimes className="text-xl" />
-                                </button>
-                            </div>
-                            <form onSubmit={handleWithdraw} className="p-6 space-y-5">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Amount (₱)
-                                    </label>
-                                    <input
-                                        key="withdraw-amount-input"
-                                        type="number"
-                                        value={withdrawAmount}
-                                        onChange={(e) => setWithdrawAmount(e.target.value)}
-                                        className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 transition"
-                                        placeholder="Enter amount"
-                                        min="1"
-                                        step="0.01"
-                                        max={balance}
-                                        required
-                                        disabled={processing}
-                                        autoFocus={showWithdrawModal}
-                                    />
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        Available: ₱{balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </p>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        PayPal Email Address *
-                                    </label>
-                                    <input
-                                        ref={withdrawEmailInputRef}
-                                        type="email"
-                                        value={withdrawEmail}
-                                        onChange={(e) => setWithdrawEmail(e.target.value)}
-                                        className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 transition"
-                                        placeholder="your.email@example.com"
-                                        required
-                                        disabled={processing}
-                                        autoComplete="email"
-                                    />
-                                </div>
-                                <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
-                                    <p className="text-sm text-yellow-800">
-                                        <strong>Processing Time:</strong> Withdrawals are typically processed within 1-3 business days.
-                                    </p>
-                                </div>
-                                <div className="flex gap-4 pt-4 border-t border-gray-200">
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowWithdrawModal(false)}
-                                        className="flex-1 px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition font-medium"
-                                        disabled={processing}
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md hover:shadow-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                                        disabled={processing}
-                                    >
-                                        {processing ? "Processing..." : "Submit Withdrawal"}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )}
+                <WithdrawModal
+                    showWithdrawModal={showWithdrawModal}
+                    withdrawAmount={withdrawAmount}
+                    withdrawEmail={withdrawEmail}
+                    balance={balance}
+                    processing={processing}
+                    onClose={handleWithdrawClose}
+                    onAmountChange={handleWithdrawAmountChange}
+                    onEmailChange={handleWithdrawEmailChange}
+                    onSubmit={handleWithdraw}
+                />
             </div>
     );
 
