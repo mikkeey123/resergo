@@ -47,7 +47,9 @@ import {
   FaUsers,
   FaBed,
   FaBath,
-  FaCheck
+  FaCheck,
+  FaClock,
+  FaInfoCircle
 } from "react-icons/fa";
 import { getListing, getUserData, saveReview, getListingReviews, updateReview, updateListingRating, auth, db, validateCoupon, createBooking } from "../../Config";
 import { doc, deleteDoc } from "firebase/firestore";
@@ -60,6 +62,10 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [guests, setGuests] = useState(1);
+  // Experience/Service booking fields
+  const [bookingDate, setBookingDate] = useState("");
+  const [bookingTime, setBookingTime] = useState("");
+  const [experienceGroupSize, setExperienceGroupSize] = useState(1);
   const [showAllPhotos, setShowAllPhotos] = useState(false);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
   const [showAllReviews, setShowAllReviews] = useState(false);
@@ -703,33 +709,62 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
       return;
     }
 
-    if (!checkIn || !checkOut) {
-      setBookingError("Please select check-in and check-out dates");
-      return;
-    }
-
-    const checkInDate = new Date(checkIn);
-    const checkOutDate = new Date(checkOut);
-    
-    if (checkOutDate <= checkInDate) {
-      setBookingError("Check-out date must be after check-in date");
-      return;
-    }
-
+    const category = fullListingData?.category || "Home";
     const listingId = fullListingData?.id || listing?.id;
     if (!listingId) {
       setBookingError("Listing not found");
       return;
     }
 
+    // Category-specific validation
+    if (category === "Home") {
+      if (!checkIn || !checkOut) {
+        setBookingError("Please select check-in and check-out dates");
+        return;
+      }
+
+      const checkInDate = new Date(checkIn);
+      const checkOutDate = new Date(checkOut);
+      
+      if (checkOutDate <= checkInDate) {
+        setBookingError("Check-out date must be after check-in date");
+        return;
+      }
+    } else if (category === "Experience" || category === "Service") {
+      if (!bookingDate) {
+        setBookingError(`Please select a ${category === "Experience" ? "date" : "service date"}`);
+        return;
+      }
+      if (!bookingTime) {
+        setBookingError("Please select a time");
+        return;
+      }
+      if (category === "Experience" && experienceGroupSize < 1) {
+        setBookingError("Please select at least 1 participant");
+        return;
+      }
+    }
+
     setBookingLoading(true);
     try {
-      await createBooking(listingId, {
-        checkIn: checkIn,
-        checkOut: checkOut,
-        guests: guests,
+      const bookingData = {
         couponCode: appliedCoupon ? couponCode : null
-      });
+      };
+
+      // Add category-specific booking data
+      if (category === "Home") {
+        bookingData.checkIn = checkIn;
+        bookingData.checkOut = checkOut;
+        bookingData.guests = guests;
+      } else if (category === "Experience" || category === "Service") {
+        bookingData.bookingDate = bookingDate;
+        bookingData.bookingTime = bookingTime;
+        if (category === "Experience") {
+          bookingData.groupSize = experienceGroupSize;
+        }
+      }
+
+      await createBooking(listingId, bookingData);
 
       setBookingSuccess("Booking request submitted! The host will review and approve your booking. You will receive an email notification once it's approved.");
       
@@ -737,6 +772,9 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
       setCheckIn("");
       setCheckOut("");
       setGuests(1);
+      setBookingDate("");
+      setBookingTime("");
+      setExperienceGroupSize(1);
       setCouponCode("");
       setAppliedCoupon(null);
       
@@ -1041,38 +1079,151 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
               </div>
             </div>
 
-            {/* Basics Section */}
-            <div className="border border-gray-200 rounded-xl p-4 md:p-6 mb-8 bg-white shadow-sm">
-              <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">
-                About this place
-              </h2>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-                <div className="flex items-center gap-3">
-                  <FaUsers className="text-2xl text-blue-600" />
-                  <div className="text-lg font-semibold text-gray-900">
-                    {fullListingData?.basics?.guests || listing?.basics?.guests || 1} {(fullListingData?.basics?.guests || listing?.basics?.guests || 1) === 1 ? 'guest' : 'guests'}
+            {/* Basics Section - Category Specific */}
+            {fullListingData?.category === "Home" && (
+              <div className="border border-gray-200 rounded-xl p-4 md:p-6 mb-8 bg-white shadow-sm">
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">
+                  About this place
+                </h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                  <div className="flex items-center gap-3">
+                    <FaUsers className="text-2xl text-blue-600" />
+                    <div className="text-lg font-semibold text-gray-900">
+                      {fullListingData?.basics?.guests || listing?.basics?.guests || 1} {(fullListingData?.basics?.guests || listing?.basics?.guests || 1) === 1 ? 'guest' : 'guests'}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <FaBed className="text-2xl text-blue-600" />
-                  <div className="text-lg font-semibold text-gray-900">
-                    {fullListingData?.basics?.bedrooms || listing?.basics?.bedrooms || 1} {(fullListingData?.basics?.bedrooms || listing?.basics?.bedrooms || 1) === 1 ? 'bedroom' : 'bedrooms'}
+                  <div className="flex items-center gap-3">
+                    <FaBed className="text-2xl text-blue-600" />
+                    <div className="text-lg font-semibold text-gray-900">
+                      {fullListingData?.basics?.bedrooms || listing?.basics?.bedrooms || 1} {(fullListingData?.basics?.bedrooms || listing?.basics?.bedrooms || 1) === 1 ? 'bedroom' : 'bedrooms'}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <FaBed className="text-2xl text-blue-600" />
-                  <div className="text-lg font-semibold text-gray-900">
-                    {fullListingData?.basics?.beds || listing?.basics?.beds || 1} {(fullListingData?.basics?.beds || listing?.basics?.beds || 1) === 1 ? 'bed' : 'beds'}
+                  <div className="flex items-center gap-3">
+                    <FaBed className="text-2xl text-blue-600" />
+                    <div className="text-lg font-semibold text-gray-900">
+                      {fullListingData?.basics?.beds || listing?.basics?.beds || 1} {(fullListingData?.basics?.beds || listing?.basics?.beds || 1) === 1 ? 'bed' : 'beds'}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <FaBath className="text-2xl text-blue-600" />
-                  <div className="text-lg font-semibold text-gray-900">
-                    {fullListingData?.basics?.bathrooms || listing?.basics?.bathrooms || 1} {(fullListingData?.basics?.bathrooms || listing?.basics?.bathrooms || 1) === 1 ? 'bathroom' : 'bathrooms'}
+                  <div className="flex items-center gap-3">
+                    <FaBath className="text-2xl text-blue-600" />
+                    <div className="text-lg font-semibold text-gray-900">
+                      {fullListingData?.basics?.bathrooms || listing?.basics?.bathrooms || 1} {(fullListingData?.basics?.bathrooms || listing?.basics?.bathrooms || 1) === 1 ? 'bathroom' : 'bathrooms'}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {/* Experience Details Section */}
+            {fullListingData?.category === "Experience" && (
+              <div className="border border-gray-200 rounded-xl p-4 md:p-6 mb-8 bg-white shadow-sm">
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">
+                  Experience Details
+                </h2>
+                <div className="space-y-4">
+                  {fullListingData?.duration && (
+                    <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+                      <FaClock className="text-2xl text-blue-600" />
+                      <div>
+                        <div className="text-lg font-semibold text-gray-900">
+                          {fullListingData.duration} {fullListingData.duration === 1 ? 'hour' : 'hours'}
+                        </div>
+                        <div className="text-sm text-gray-600">Duration</div>
+                      </div>
+                    </div>
+                  )}
+                  {fullListingData?.groupSize && (
+                    <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+                      <FaUsers className="text-2xl text-green-600" />
+                      <div>
+                        <div className="text-lg font-semibold text-gray-900">
+                          Up to {fullListingData.groupSize} {fullListingData.groupSize === 1 ? 'participant' : 'participants'}
+                        </div>
+                        <div className="text-sm text-gray-600">Maximum group size</div>
+                      </div>
+                    </div>
+                  )}
+                  {fullListingData?.whatsIncluded && (
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                        <FaCheckCircle className="text-green-600" />
+                        What's Included
+                      </h3>
+                      <p className="text-gray-700 whitespace-pre-wrap">{fullListingData.whatsIncluded}</p>
+                    </div>
+                  )}
+                  {fullListingData?.meetingPoint && (
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                        <FaMapMarkerAlt className="text-red-600" />
+                        Meeting Point
+                      </h3>
+                      <p className="text-gray-700">{fullListingData.meetingPoint}</p>
+                    </div>
+                  )}
+                  {fullListingData?.requirements && (
+                    <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                        <FaExclamationTriangle className="text-yellow-600" />
+                        Requirements
+                      </h3>
+                      <p className="text-gray-700 whitespace-pre-wrap">{fullListingData.requirements}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Service Details Section */}
+            {fullListingData?.category === "Service" && (
+              <div className="border border-gray-200 rounded-xl p-4 md:p-6 mb-8 bg-white shadow-sm">
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-6">
+                  Service Details
+                </h2>
+                <div className="space-y-4">
+                  {fullListingData?.serviceType && (
+                    <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg">
+                      <FaInfoCircle className="text-2xl text-purple-600" />
+                      <div>
+                        <div className="text-lg font-semibold text-gray-900">
+                          {fullListingData.serviceType}
+                        </div>
+                        <div className="text-sm text-gray-600">Service Type</div>
+                      </div>
+                    </div>
+                  )}
+                  {fullListingData?.serviceDuration && (
+                    <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+                      <FaClock className="text-2xl text-blue-600" />
+                      <div>
+                        <div className="text-lg font-semibold text-gray-900">
+                          {fullListingData.serviceDuration}
+                        </div>
+                        <div className="text-sm text-gray-600">Duration</div>
+                      </div>
+                    </div>
+                  )}
+                  {fullListingData?.serviceIncludes && (
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                        <FaCheckCircle className="text-green-600" />
+                        What's Included
+                      </h3>
+                      <p className="text-gray-700 whitespace-pre-wrap">{fullListingData.serviceIncludes}</p>
+                    </div>
+                  )}
+                  {fullListingData?.serviceRequirements && (
+                    <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <h3 className="font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                        <FaExclamationTriangle className="text-yellow-600" />
+                        Requirements
+                      </h3>
+                      <p className="text-gray-700 whitespace-pre-wrap">{fullListingData.serviceRequirements}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Amenities Section */}
             {listingData.amenities.length > 0 && (
@@ -1406,7 +1557,11 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
                   <span className="text-2xl font-bold text-gray-900">
                     {listingData.currency}{listingData.price.toLocaleString()}
                   </span>
-                  <span className="text-gray-600">night</span>
+                  <span className="text-gray-600">
+                    {fullListingData?.category === "Home" ? "night" :
+                     fullListingData?.category === "Experience" ? "per person" :
+                     "per service"}
+                  </span>
                 </div>
                 
                 {/* Coupon Code Input */}
@@ -1461,89 +1616,211 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
                   )}
                 </div>
 
-                {nights > 0 && (
-                  <div className="mb-2">
-                    <div className="flex justify-between text-sm text-gray-600 mb-1">
-                      <span>
-                        {listingData.currency}{listingData.price.toLocaleString()} x {nights} {nights === 1 ? 'night' : 'nights'}
-                      </span>
-                      <span>
-                        {listingData.currency}{(listingData.price * nights).toLocaleString()}
-                      </span>
-                    </div>
-                    {appliedCoupon && appliedCoupon.valid && (
-                      <div className="flex justify-between text-sm text-green-600 mb-1">
-                        <span>Coupon Discount</span>
-                        <span>-{listingData.currency}{appliedCoupon.discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                {(() => {
+                  const category = fullListingData?.category || "Home";
+                  if (category === "Home" && nights > 0) {
+                    return (
+                      <div className="mb-2">
+                        <div className="flex justify-between text-sm text-gray-600 mb-1">
+                          <span>
+                            {listingData.currency}{listingData.price.toLocaleString()} x {nights} {nights === 1 ? 'night' : 'nights'}
+                          </span>
+                          <span>
+                            {listingData.currency}{(listingData.price * nights).toLocaleString()}
+                          </span>
+                        </div>
+                        {appliedCoupon && appliedCoupon.valid && (
+                          <div className="flex justify-between text-sm text-green-600 mb-1">
+                            <span>Coupon Discount</span>
+                            <span>-{listingData.currency}{appliedCoupon.discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between font-semibold text-gray-900 border-t border-gray-200 pt-2 mt-2">
+                          <span>Total</span>
+                          <span>{listingData.currency}{calculateTotal().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
                       </div>
-                    )}
-                    <div className="flex justify-between font-semibold text-gray-900 border-t border-gray-200 pt-2 mt-2">
-                      <span>Total</span>
-                      <span>{listingData.currency}{calculateTotal().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-                  </div>
-                )}
+                    );
+                  } else if (category === "Experience" && bookingDate && experienceGroupSize > 0) {
+                    const total = listingData.price * experienceGroupSize;
+                    return (
+                      <div className="mb-2">
+                        <div className="flex justify-between text-sm text-gray-600 mb-1">
+                          <span>
+                            {listingData.currency}{listingData.price.toLocaleString()} x {experienceGroupSize} {experienceGroupSize === 1 ? 'person' : 'people'}
+                          </span>
+                          <span>
+                            {listingData.currency}{total.toLocaleString()}
+                          </span>
+                        </div>
+                        {appliedCoupon && appliedCoupon.valid && (
+                          <div className="flex justify-between text-sm text-green-600 mb-1">
+                            <span>Coupon Discount</span>
+                            <span>-{listingData.currency}{appliedCoupon.discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between font-semibold text-gray-900 border-t border-gray-200 pt-2 mt-2">
+                          <span>Total</span>
+                          <span>{listingData.currency}{(appliedCoupon && appliedCoupon.valid ? total - appliedCoupon.discountAmount : total).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                      </div>
+                    );
+                  } else if (category === "Service" && bookingDate) {
+                    return (
+                      <div className="mb-2">
+                        <div className="flex justify-between text-sm text-gray-600 mb-1">
+                          <span>Service Fee</span>
+                          <span>{listingData.currency}{listingData.price.toLocaleString()}</span>
+                        </div>
+                        {appliedCoupon && appliedCoupon.valid && (
+                          <div className="flex justify-between text-sm text-green-600 mb-1">
+                            <span>Coupon Discount</span>
+                            <span>-{listingData.currency}{appliedCoupon.discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between font-semibold text-gray-900 border-t border-gray-200 pt-2 mt-2">
+                          <span>Total</span>
+                          <span>{listingData.currency}{(appliedCoupon && appliedCoupon.valid ? listingData.price - appliedCoupon.discountAmount : listingData.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
                 <p className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded inline-block mt-2 border border-blue-100">
                   Prices include all fees
                 </p>
               </div>
 
               <div className="space-y-4">
-                {/* Check-in */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase">
-                    CHECK-IN
-                  </label>
-                  <input
-                    type="date"
-                    value={checkIn}
-                    onChange={(e) => setCheckIn(e.target.value)}
-                    min={new Date().toISOString().split('T')[0]}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+                {/* Home Category: Check-in, Check-out, Guests */}
+                {fullListingData?.category === "Home" && (
+                  <>
+                    {/* Check-in */}
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase">
+                        CHECK-IN
+                      </label>
+                      <input
+                        type="date"
+                        value={checkIn}
+                        onChange={(e) => setCheckIn(e.target.value)}
+                        min={new Date().toISOString().split('T')[0]}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      />
+                    </div>
 
-                {/* Check-out */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase">
-                    CHECKOUT
-                  </label>
-                  <input
-                    type="date"
-                    value={checkOut}
-                    onChange={(e) => setCheckOut(e.target.value)}
-                    min={checkIn || new Date().toISOString().split('T')[0]}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+                    {/* Check-out */}
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase">
+                        CHECKOUT
+                      </label>
+                      <input
+                        type="date"
+                        value={checkOut}
+                        onChange={(e) => setCheckOut(e.target.value)}
+                        min={checkIn || new Date().toISOString().split('T')[0]}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      />
+                    </div>
 
-                {/* Guests */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase">
-                    GUESTS
-                  </label>
-                  {(() => {
-                    const maxGuests = fullListingData?.basics?.guests || listing?.basics?.guests || 1;
-                    return (
-                      <>
-                        <select
-                          value={guests}
-                          onChange={(e) => setGuests(parseInt(e.target.value))}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          {Array.from({ length: maxGuests }, (_, i) => i + 1).map((num) => (
-                            <option key={num} value={num}>
-                              {num} {num === 1 ? "guest" : "guests"}
-                            </option>
-                          ))}
-                        </select>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Maximum {maxGuests} {maxGuests === 1 ? 'guest' : 'guests'} allowed
-                        </p>
-                      </>
-                    );
-                  })()}
-                </div>
+                    {/* Guests */}
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase">
+                        GUESTS
+                      </label>
+                      {(() => {
+                        const maxGuests = fullListingData?.basics?.guests || listing?.basics?.guests || 1;
+                        return (
+                          <>
+                            <select
+                              value={guests}
+                              onChange={(e) => setGuests(parseInt(e.target.value))}
+                              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                            >
+                              {Array.from({ length: maxGuests }, (_, i) => i + 1).map((num) => (
+                                <option key={num} value={num}>
+                                  {num} {num === 1 ? "guest" : "guests"}
+                                </option>
+                              ))}
+                            </select>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Maximum {maxGuests} {maxGuests === 1 ? 'guest' : 'guests'} allowed
+                            </p>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </>
+                )}
+
+                {/* Experience/Service Category: Date, Time, Group Size (for Experience) */}
+                {(fullListingData?.category === "Experience" || fullListingData?.category === "Service") && (
+                  <>
+                    {/* Booking Date */}
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase">
+                        {fullListingData?.category === "Experience" ? "EXPERIENCE DATE" : "SERVICE DATE"}
+                      </label>
+                      <input
+                        type="date"
+                        value={bookingDate}
+                        onChange={(e) => setBookingDate(e.target.value)}
+                        min={new Date().toISOString().split('T')[0]}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      />
+                    </div>
+
+                    {/* Booking Time */}
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase">
+                        TIME
+                      </label>
+                      <input
+                        type="time"
+                        value={bookingTime}
+                        onChange={(e) => setBookingTime(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                      />
+                    </div>
+
+                    {/* Group Size (Experience only) */}
+                    {fullListingData?.category === "Experience" && (
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase">
+                          PARTICIPANTS
+                        </label>
+                        {(() => {
+                          const maxGroupSize = fullListingData?.groupSize || 10;
+                          return (
+                            <>
+                              <div className="flex items-center gap-4">
+                                <button
+                                  type="button"
+                                  onClick={() => setExperienceGroupSize(Math.max(1, experienceGroupSize - 1))}
+                                  className="w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition"
+                                >
+                                  <span className="text-gray-600">−</span>
+                                </button>
+                                <span className="text-lg font-medium text-gray-900 w-12 text-center">{experienceGroupSize}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setExperienceGroupSize(Math.min(maxGroupSize, experienceGroupSize + 1))}
+                                  className="w-10 h-10 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition"
+                                >
+                                  <span className="text-gray-600">+</span>
+                                </button>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-1">
+                                Maximum {maxGroupSize} {maxGroupSize === 1 ? 'participant' : 'participants'} allowed
+                              </p>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </>
+                )}
 
                 {/* Booking Messages */}
                 {bookingError && (
@@ -1560,10 +1837,18 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
                 {/* Reserve Button */}
                 <button 
                   onClick={handleBooking}
-                  disabled={bookingLoading || !checkIn || !checkOut}
+                  disabled={(() => {
+                    const category = fullListingData?.category || "Home";
+                    if (category === "Home") {
+                      return bookingLoading || !checkIn || !checkOut;
+                    } else if (category === "Experience" || category === "Service") {
+                      return bookingLoading || !bookingDate || !bookingTime || (category === "Experience" && experienceGroupSize < 1);
+                    }
+                    return bookingLoading;
+                  })()}
                   className="w-full bg-blue-600 text-white py-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {bookingLoading ? "Submitting..." : "Reserve"}
+                  {bookingLoading ? "Submitting..." : (fullListingData?.category === "Experience" || fullListingData?.category === "Service") ? "Book Now" : "Reserve"}
                 </button>
 
                 <p className="text-center text-sm text-gray-600">
