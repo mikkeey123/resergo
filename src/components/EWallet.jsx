@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { FaWallet, FaPaypal, FaArrowUp, FaArrowDown, FaHistory, FaTimes, FaCheckCircle } from "react-icons/fa";
 import { auth, getWalletBalance, topUpWallet, withdrawFromWallet, getTransactionHistory } from "../../Config";
 import { onAuthStateChanged } from "firebase/auth";
@@ -96,6 +96,7 @@ const EWallet = ({ userId = null }) => {
     const [currentUserId, setCurrentUserId] = useState(null);
     const [paypalError, setPaypalError] = useState("");
     const [debouncedAmount, setDebouncedAmount] = useState("");
+    const withdrawEmailInputRef = useRef(null);
 
     // Get current user
     useEffect(() => {
@@ -208,6 +209,16 @@ const EWallet = ({ userId = null }) => {
         setPaypalError("");
         // PayPal button will handle the rest
     };
+
+    // Focus email input when withdraw modal opens
+    useEffect(() => {
+        if (showWithdrawModal && withdrawEmailInputRef.current) {
+            // Small delay to ensure modal is fully rendered
+            setTimeout(() => {
+                withdrawEmailInputRef.current?.focus();
+            }, 100);
+        }
+    }, [showWithdrawModal]);
 
     // Handle withdrawal
     const handleWithdraw = async (e) => {
@@ -549,7 +560,7 @@ const EWallet = ({ userId = null }) => {
                                         PayPal Email Address *
                                     </label>
                                     <input
-                                        key="withdraw-email-input"
+                                        ref={withdrawEmailInputRef}
                                         type="email"
                                         value={withdrawEmail}
                                         onChange={(e) => setWithdrawEmail(e.target.value)}
@@ -557,6 +568,7 @@ const EWallet = ({ userId = null }) => {
                                         placeholder="your.email@example.com"
                                         required
                                         disabled={processing}
+                                        autoComplete="email"
                                     />
                                 </div>
                                 <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
