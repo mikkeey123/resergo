@@ -105,7 +105,17 @@ const WithdrawModal = React.memo(({
                         <FaTimes className="text-xl" />
                     </button>
                 </div>
-                <form onSubmit={onSubmit} className="p-6 space-y-5">
+                <form onSubmit={(e) => {
+                    e.preventDefault();
+                    // Get current email value from ref (uncontrolled input)
+                    const currentEmail = emailInputRef.current?.value || withdrawEmail;
+                    // Create synthetic event with current email value
+                    const syntheticEvent = {
+                        ...e,
+                        currentEmail: currentEmail
+                    };
+                    onSubmit(syntheticEvent);
+                }} className="p-6 space-y-5">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             Amount (₱)
@@ -396,8 +406,8 @@ const EWallet = ({ userId = null }) => {
             return;
         }
 
-        // Get email from ref if available (for uncontrolled input)
-        const emailValue = emailInputRef.current?.value || withdrawEmail;
+        // Get email from event if provided (from uncontrolled input), otherwise use state
+        const emailValue = e.currentEmail || withdrawEmail;
         if (!emailValue || !emailValue.includes("@")) {
             alert("Please enter a valid PayPal email address");
             return;
@@ -408,8 +418,6 @@ const EWallet = ({ userId = null }) => {
             const targetUserId = userId || currentUserId;
             const amount = parseFloat(withdrawAmount);
             
-            // Use email from ref if available
-            const emailValue = emailInputRef.current?.value || withdrawEmail;
             const result = await withdrawFromWallet(
                 targetUserId,
                 amount,
