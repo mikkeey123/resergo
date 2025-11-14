@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from "react";
 import { FaCamera, FaUser, FaPhone, FaLock, FaEye, FaEyeSlash } from "react-icons/fa";
 import { auth, getUserData, updatePasswordInFirestore, verifyPassword, updateProfilePicture, updateUserProfile } from "../../Config";
 import { onAuthStateChanged, updateProfile } from "firebase/auth";
+import AlertPopup from "./AlertPopup";
+import Alert from "./Alert";
 
 const UserDetails = ({ onBack, hideBackButton = false, isHostPage = false }) => {
     const [currentUser, setCurrentUser] = useState(null);
@@ -313,19 +315,13 @@ const UserDetails = ({ onBack, hideBackButton = false, isHostPage = false }) => 
                 )}
 
                 {/* Error/Success Messages - Centered Pop-up */}
-                {(error || success) && (
-                    <div className="fixed inset-0 flex items-center justify-center z-20 pointer-events-none">
-                        <div className={`px-6 py-4 rounded-lg shadow-2xl animate-fade-in pointer-events-auto ${
-                            error 
-                                ? "bg-red-100 border-2 border-red-400 text-red-700" 
-                                : "bg-green-100 border-2 border-green-400 text-green-700"
-                        }`}>
-                            <p className="font-semibold text-center">
-                                {error || success}
-                            </p>
-                        </div>
-                    </div>
-                )}
+                <AlertPopup
+                    type={error ? "error" : "success"}
+                    title={error ? "Error Message" : "Success Message"}
+                    message={error || success}
+                    isOpen={!!(error || success)}
+                    dismissible={false}
+                />
 
                 {/* Profile Picture Section */}
                 <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
@@ -429,11 +425,12 @@ const UserDetails = ({ onBack, hideBackButton = false, isHostPage = false }) => 
                     </h2>
 
                     {!hasPassword && (
-                        <div className="mb-5 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                            <p className="text-sm text-yellow-700 flex items-center gap-2">
-                                <FaLock className="text-yellow-600" />
-                                You don't have a password set yet. Set one below to enable email/password login.
-                            </p>
+                        <div className="mb-5">
+                            <Alert
+                                type="warning"
+                                title="No Password Set"
+                                message="You don't have a password set. Please set a password to secure your account."
+                            />
                         </div>
                     )}
 

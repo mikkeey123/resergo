@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import UserSignup from "./UserSignup";
 import { handleGoogleSignup, auth, getUserType, updateUserType } from "../../Config";
 import { signOut, signInWithEmailAndPassword } from "firebase/auth";
+import AlertPopup from "../components/AlertPopup";
 
-const LoginForm = ({ title = "Login", loginType = "guest", onNavigateToGuest, onNavigateToHost, onNavigateToHome, onClose, onGoogleSignIn, showSignup = false, onSwitchToSignup }) => {
+const LoginForm = ({ title = "Login", loginType = "guest", onNavigateToGuest, onNavigateToHost, onNavigateToAdmin, onNavigateToHome, onClose, onGoogleSignIn, showSignup = false, onSwitchToSignup }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSignup, setIsSignup] = useState(showSignup);
@@ -68,6 +69,20 @@ const LoginForm = ({ title = "Login", loginType = "guest", onNavigateToGuest, on
       // Check user type and validate against loginType
       try {
         const userType = await getUserType(user.uid);
+        
+        // Admin users can login from both guest and host login pages
+        if (userType === "admin") {
+          console.log("Admin user detected, navigating to admin page");
+          onClose();
+          setTimeout(() => {
+            if (onNavigateToAdmin) {
+              onNavigateToAdmin();
+            } else {
+              console.error("onNavigateToAdmin is not defined");
+            }
+          }, 100);
+          return;
+        }
         
         // If trying to access host page, user must be a host
         if (loginType === "host") {
@@ -184,9 +199,23 @@ const LoginForm = ({ title = "Login", loginType = "guest", onNavigateToGuest, on
         // Existing user with complete account - check user type before navigating
         console.log("Existing Google user with complete account, logging in");
         
-        // Check user type and validate against loginType
+          // Check user type and validate against loginType
         try {
           const userType = await getUserType(result.user.uid);
+          
+          // Admin users can login from both guest and host login pages
+          if (userType === "admin") {
+            console.log("Admin user detected via Google, navigating to admin page");
+            onClose();
+            setTimeout(() => {
+              if (onNavigateToAdmin) {
+                onNavigateToAdmin();
+              } else {
+                console.error("onNavigateToAdmin is not defined");
+              }
+            }, 100);
+            return;
+          }
           
           // If trying to access host page, check and convert if needed
           if (loginType === "host") {
@@ -260,19 +289,13 @@ const LoginForm = ({ title = "Login", loginType = "guest", onNavigateToGuest, on
       </h2>
 
       {/* Error/Success Messages - Centered Pop-up */}
-      {(error || success) && (
-        <div className="fixed inset-0 flex items-center justify-center z-20 pointer-events-none">
-          <div className={`px-6 py-4 rounded-lg shadow-2xl animate-fade-in pointer-events-auto ${
-            error 
-              ? "bg-red-100 border-2 border-red-400 text-red-700" 
-              : "bg-green-100 border-2 border-green-400 text-green-700"
-          }`}>
-            <p className="font-semibold text-center">
-              {error || success}
-            </p>
-          </div>
-        </div>
-      )}
+      <AlertPopup
+        type={error ? "error" : "success"}
+        title={error ? "Error Message" : "Success Message"}
+        message={error || success}
+        isOpen={!!(error || success)}
+        dismissible={false}
+      />
 
       {/* Login form */}
       <form onSubmit={handleSubmit} className="space-y-5 w-90">

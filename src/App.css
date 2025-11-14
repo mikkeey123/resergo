@@ -14,3 +14,55 @@
 .animate-fade-in {
     animation: fadeIn 0.3s ease-out;
 }
+
+/* Fix Leaflet map z-index issues in modals */
+.leaflet-container {
+    z-index: 0 !important;
+}
+
+.leaflet-control {
+    z-index: 1 !important;
+}
+
+.leaflet-popup {
+    z-index: 1000 !important;
+}
+
+/* Ensure search dropdown appears above map */
+.leaflet-top,
+.leaflet-bottom {
+    z-index: 1 !important;
+}
+
+/* Ensure location search dropdown appears above modal */
+.location-search-container {
+    position: relative;
+}
+
+.location-search-dropdown {
+    /* Portal renders this outside modal, so no need for these styles */
+}
+
+/* Custom scrollbar styling for modals */
+.overflow-y-auto::-webkit-scrollbar {
+    width: 8px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Ensure scrollbar doesn't overlap with content */
+.overflow-y-auto {
+    scrollbar-gutter: stable;
+}

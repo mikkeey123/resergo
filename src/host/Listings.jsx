@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { FaEdit, FaTrash, FaEye, FaCheckCircle, FaTimesCircle, FaPlus, FaFileAlt } from "react-icons/fa";
-import { auth, getHostListings } from "../../Config";
+import { FaEdit, FaTrash, FaUpload, FaCheckCircle, FaTimesCircle, FaPlus, FaFileAlt } from "react-icons/fa";
+import { auth, getHostListings, deleteListing, updateListing } from "../../Config";
 import AddListingModal from "./AddListingModal";
 
 const Listings = () => {
@@ -8,6 +8,7 @@ const Listings = () => {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState("all"); // all, published, drafts
     const [modalOpen, setModalOpen] = useState(false);
+    const [editingListing, setEditingListing] = useState(null);
 
     useEffect(() => {
         loadListings();
@@ -49,23 +50,46 @@ const Listings = () => {
     };
 
     const handleDelete = async (listingId) => {
-        if (window.confirm("Are you sure you want to delete this listing?")) {
-            // TODO: Implement delete listing function
-            console.log("Delete listing:", listingId);
-            setListings(listings.filter(l => l.id !== listingId));
+        if (window.confirm("Are you sure you want to delete this listing? This action cannot be undone.")) {
+            try {
+                await deleteListing(listingId);
+                // Remove from local state
+                setListings(listings.filter(l => l.id !== listingId));
+                alert("Listing deleted successfully!");
+            } catch (error) {
+                console.error("Error deleting listing:", error);
+                alert("Failed to delete listing: " + (error.message || "Unknown error"));
+            }
         }
     };
 
+    const handleEdit = (listing) => {
+        setEditingListing(listing);
+        setModalOpen(true);
+    };
+
+    const handleModalClose = () => {
+        setModalOpen(false);
+        setEditingListing(null);
+    };
+
     const handlePublish = async (listingId) => {
-        // TODO: Implement publish listing function
-        console.log("Publish listing:", listingId);
-        setListings(listings.map(l => 
-            l.id === listingId ? { ...l, status: "published", isDraft: false } : l
-        ));
+        try {
+            await updateListing(listingId, { isDraft: false });
+            // Update local state
+            setListings(listings.map(l => 
+                l.id === listingId ? { ...l, isDraft: false } : l
+            ));
+            alert("Listing published successfully!");
+        } catch (error) {
+            console.error("Error publishing listing:", error);
+            alert("Failed to publish listing: " + (error.message || "Unknown error"));
+        }
     };
 
     const handleModalSuccess = () => {
-        loadListings(); // Reload listings after successful creation
+        loadListings(); // Reload listings after successful creation/update
+        setEditingListing(null); // Clear editing state
     };
 
     const filteredListings = activeTab === "all" 
@@ -197,6 +221,7 @@ const Listings = () => {
                                 </p>
                                 <div className="flex gap-2">
                                     <button
+                                        onClick={() => handleEdit(listing)}
                                         className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm font-medium"
                                     >
                                         <FaEdit className="inline mr-1" />
@@ -205,6 +230,7 @@ const Listings = () => {
                                     <button
                                         onClick={() => handleDelete(listing.id)}
                                         className="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition text-sm"
+                                        title="Delete"
                                     >
                                         <FaTrash />
                                     </button>
@@ -214,7 +240,7 @@ const Listings = () => {
                                             className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition text-sm"
                                             title="Publish"
                                         >
-                                            <FaEye />
+                                            <FaUpload />
                                         </button>
                                     )}
                                 </div>
@@ -224,11 +250,12 @@ const Listings = () => {
                 </div>
             )}
 
-            {/* Add Listing Modal */}
+            {/* Add/Edit Listing Modal */}
             <AddListingModal 
                 isOpen={modalOpen} 
-                onClose={() => setModalOpen(false)}
+                onClose={handleModalClose}
                 onSuccess={handleModalSuccess}
+                editingListing={editingListing}
             />
         </div>
     );

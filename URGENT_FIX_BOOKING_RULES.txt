@@ -1,0 +1,236 @@
+rules_version = '2';
+
+service cloud.firestore {
+
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+
+      return request.auth != null;
+
+    }
+
+    function getUserData() {
+
+      return get(/databases/$(database)/documents/Resergodb/$(request.auth.uid)).data;
+
+    }
+
+    function isHost() {
+
+      return isAuthenticated() && 
+
+             exists(/databases/$(database)/documents/Resergodb/$(request.auth.uid)) &&
+
+             getUserData().UserType == 'host';
+
+    }
+
+    match /Resergodb/{userId} {
+
+      allow read: if isAuthenticated();
+
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+
+    }
+
+    match /listings/{listingId} {
+
+      allow read: if resource.data.isDraft == false || 
+
+                     (isAuthenticated() && resource.data.hostId == request.auth.uid);
+
+      allow create: if isHost() && 
+
+                       request.resource.data.hostId == request.auth.uid;
+
+      allow update: if (isHost() && 
+
+                       resource.data.hostId == request.auth.uid &&
+
+                       request.resource.data.hostId == request.auth.uid) ||
+
+                     (isAuthenticated() && 
+
+                       request.resource.data.hostId == resource.data.hostId &&
+
+                       request.resource.data.title == resource.data.title &&
+
+                       request.resource.data.rate == resource.data.rate &&
+
+                       request.resource.data.isDraft == resource.data.isDraft);
+
+      allow delete: if isHost() && 
+
+                       resource.data.hostId == request.auth.uid;
+
+    }
+
+    match /reviews/{reviewId} {
+
+      allow read: if isAuthenticated();
+
+      allow create: if isAuthenticated() && 
+
+                       request.resource.data.guestId == request.auth.uid;
+
+      allow update: if isAuthenticated() && 
+
+                       resource.data.guestId == request.auth.uid &&
+
+                       request.resource.data.guestId == request.auth.uid;
+
+      allow delete: if isAuthenticated() && 
+
+                       resource.data.guestId == request.auth.uid;
+
+    }
+
+    match /favorites/{userId} {
+
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+
+      allow update: if isAuthenticated() && request.auth.uid == userId;
+
+      allow delete: if isAuthenticated() && request.auth.uid == userId;
+
+    }
+
+    match /messages/{messageId} {
+
+      allow read: if isAuthenticated() && 
+
+                     (resource.data.senderId == request.auth.uid || 
+
+                      resource.data.receiverId == request.auth.uid);
+
+      allow create: if isAuthenticated() && 
+
+                       request.resource.data.senderId == request.auth.uid &&
+
+                       request.resource.data.receiverId != null &&
+
+                       request.resource.data.message != null &&
+
+                       request.resource.data.message is string &&
+
+                       request.resource.data.message.size() > 0;
+
+      allow update: if isAuthenticated() && 
+
+                       resource.data.receiverId == request.auth.uid &&
+
+                       request.resource.data.senderId == resource.data.senderId &&
+
+                       request.resource.data.receiverId == resource.data.receiverId &&
+
+                       request.resource.data.message == resource.data.message;
+
+      allow delete: if isAuthenticated() && 
+
+                       (resource.data.senderId == request.auth.uid ||
+
+                        resource.data.receiverId == request.auth.uid);
+
+    }
+
+    match /conversations/{conversationId} {
+
+      allow read: if isAuthenticated() && 
+
+                     (resource.data.participant1Id == request.auth.uid || 
+
+                      resource.data.participant2Id == request.auth.uid);
+
+      allow create: if isAuthenticated() && 
+
+                       (request.resource.data.participant1Id == request.auth.uid || 
+
+                        request.resource.data.participant2Id == request.auth.uid);
+
+      allow update: if isAuthenticated() && 
+
+                       (resource.data.participant1Id == request.auth.uid || 
+
+                        resource.data.participant2Id == request.auth.uid) &&
+
+                       request.resource.data.participant1Id == resource.data.participant1Id &&
+
+                       request.resource.data.participant2Id == resource.data.participant2Id;
+
+      allow delete: if isAuthenticated() && 
+
+                       (resource.data.participant1Id == request.auth.uid ||
+
+                        resource.data.participant2Id == request.auth.uid);
+
+    }
+
+    match /wallets/{userId} {
+
+      allow read: if isAuthenticated();
+
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+
+      allow update: if isAuthenticated();
+
+      allow delete: if false;
+
+    }
+
+    match /transactions/{transactionId} {
+
+      allow read: if isAuthenticated() && 
+
+                     resource.data.userId == request.auth.uid;
+
+      allow create: if isAuthenticated();
+
+      allow update: if isAuthenticated() && 
+
+                       resource.data.userId == request.auth.uid &&
+
+                       request.resource.data.userId == request.auth.uid;
+
+      allow delete: if false;
+
+    }
+
+    match /coupons/{couponId} {
+
+      allow read: if isAuthenticated();
+
+      allow create: if isAuthenticated() && 
+
+                       request.resource.data.hostId == request.auth.uid;
+
+      allow update: if isAuthenticated() && 
+
+                       resource.data.hostId == request.auth.uid &&
+
+                       request.resource.data.hostId == request.auth.uid;
+
+      allow delete: if isAuthenticated() && 
+
+                       resource.data.hostId == request.auth.uid;
+
+    }
+
+    match /bookings/{bookingId} {
+
+      allow read: if isAuthenticated();
+
+      allow create: if isAuthenticated();
+
+      allow update: if isAuthenticated();
+
+      allow delete: if false;
+
+    }
+
+  }
+
+}
+

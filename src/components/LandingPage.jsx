@@ -13,7 +13,7 @@ import {
   FaChartLine
 } from "react-icons/fa";
 
-const LandingPage = ({ onNavigateToGuest, onNavigateToHost, onShowGoogleSignupModal }) => {
+const LandingPage = ({ onNavigateToGuest, onNavigateToHost, onNavigateToAdmin, onShowGoogleSignupModal }) => {
   const [loginOpen, setLoginOpen] = useState(false);
   const [loginType, setLoginType] = useState("guest");
 
@@ -253,6 +253,7 @@ const LandingPage = ({ onNavigateToGuest, onNavigateToHost, onShowGoogleSignupMo
           loginType={loginType}
           onNavigateToGuest={onNavigateToGuest}
           onNavigateToHost={onNavigateToHost}
+          onNavigateToAdmin={onNavigateToAdmin}
           onNavigateToHome={() => setLoginOpen(false)}
           onClose={() => setLoginOpen(false)}
           onGoogleSignIn={(userInfo) => {

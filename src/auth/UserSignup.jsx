@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { saveGoogleUserData, auth, googleProvider } from "../../Config";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, linkWithCredential, signOut, GoogleAuthProvider, EmailAuthProvider } from "firebase/auth";
+import AlertPopup from "../components/AlertPopup";
+import { compressImage } from "../utils/imageCompression";
 
 const UserSignup = ({ title = "Sign Up", loginType = "guest", onNavigateToGuest, onNavigateToHost, onClose, onSwitchToLogin, onGoogleSignIn, isGoogleSignup = false, pendingUser = null }) => {
   const [username, setUsername] = useState("");
   const [number, setNumber] = useState("");
   const [password, setPassword] = useState("");
+  const [profilePicture, setProfilePicture] = useState(null);
+  const [profilePicturePreview, setProfilePicturePreview] = useState(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -22,10 +26,43 @@ const UserSignup = ({ title = "Sign Up", loginType = "guest", onNavigateToGuest,
     }
   }, [error, success]);
 
+  const handleProfilePictureChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        setError("Please select a valid image file");
+        return;
+      }
+      
+      try {
+        // Compress the image before storing
+        const compressedImage = await compressImage(file, 400, 400, 0.7);
+        setProfilePicture(compressedImage);
+        
+        // Create preview
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setProfilePicturePreview(reader.result);
+        };
+        reader.readAsDataURL(file);
+      } catch (error) {
+        console.error("Error compressing image:", error);
+        setError("Failed to process image. Please try again.");
+      }
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
+    
+    // Validate profile picture is required
+    if (!profilePicture) {
+      setError("Profile picture is required");
+      setLoading(false);
+      return;
+    }
     
     console.log("UserSignup handleSubmit - loginType:", loginType, "isGoogleSignup:", isGoogleSignup);
     
@@ -127,8 +164,10 @@ const UserSignup = ({ title = "Sign Up", loginType = "guest", onNavigateToGuest,
           throw new Error("Unable to determine user ID. Please try signing in with Google again.");
         }
         console.log("Saving user data to Firestore with UID:", uid, "Username:", username, "Phone:", number, "UserType:", loginType);
-        await saveGoogleUserData(uid, username, number, password, loginType, userEmail);
+        await saveGoogleUserData(uid, username, number, password, loginType, userEmail, profilePicture);
         console.log("User data saved to Firestore successfully");
+        
+        // Note: Welcome email is sent automatically in saveGoogleUserData function
         
         // Step 3: Account setup complete
         // Check if account has both Google and password providers
@@ -251,19 +290,13 @@ const UserSignup = ({ title = "Sign Up", loginType = "guest", onNavigateToGuest,
       </h2>
 
       {/* Error/Success Messages - Centered Pop-up */}
-      {(error || success) && (
-        <div className="fixed inset-0 flex items-center justify-center z-20 pointer-events-none">
-          <div className={`px-6 py-4 rounded-lg shadow-2xl animate-fade-in pointer-events-auto ${
-            error 
-              ? "bg-red-100 border-2 border-red-400 text-red-700" 
-              : "bg-green-100 border-2 border-green-400 text-green-700"
-          }`}>
-            <p className="font-semibold text-center">
-              {error || success}
-            </p>
-          </div>
-        </div>
-      )}
+      <AlertPopup
+        type={error ? "error" : "success"}
+        title={error ? "Error Message" : "Success Message"}
+        message={error || success}
+        isOpen={!!(error || success)}
+        dismissible={false}
+      />
 
       {/* Signup form */}
       <form onSubmit={handleSubmit} className="space-y-4 w-90">
@@ -315,6 +348,36 @@ const UserSignup = ({ title = "Sign Up", loginType = "guest", onNavigateToGuest,
               You can use this password to log in with your email, or continue using Google
             </p>
           )}
+        </div>
+
+        {/* Profile Picture */}
+        <div className="w-full">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Profile Picture <span className="text-red-500">*</span>
+          </label>
+          <div className="flex items-center gap-4">
+            {profilePicturePreview && (
+              <div className="flex-shrink-0">
+                <img
+                  src={profilePicturePreview}
+                  alt="Profile preview"
+                  className="w-20 h-20 rounded-full object-cover border-2 border-gray-300"
+                />
+              </div>
+            )}
+            <div className="flex-1">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleProfilePictureChange}
+                required
+                className="w-full px-5 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Please upload a profile picture (JPG, PNG, etc.)
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Sign up button */}

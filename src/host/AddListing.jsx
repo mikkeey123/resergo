@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import { auth, saveListing } from "../../Config";
 import { FaPlus, FaTrash, FaSave } from "react-icons/fa";
+import Alert from "../components/Alert";
 
 const AddListing = () => {
     const [category, setCategory] = useState("Home"); // Home, Experience, Service
     const [title, setTitle] = useState("");
     const [rate, setRate] = useState("");
-    const [discount, setDiscount] = useState("");
     const [promos, setPromos] = useState([]);
     const [promoInput, setPromoInput] = useState("");
     const [images, setImages] = useState([]);
@@ -78,7 +78,6 @@ const AddListing = () => {
                 category,
                 title,
                 rate: parseFloat(rate) || 0,
-                discount: parseFloat(discount) || 0,
                 promos,
                 images,
                 location: {
@@ -146,7 +145,6 @@ const AddListing = () => {
                 category,
                 title,
                 rate: parseFloat(rate) || 0,
-                discount: parseFloat(discount) || 0,
                 promos,
                 images,
                 location: {
@@ -168,7 +166,6 @@ const AddListing = () => {
                 setCategory("Home");
                 setTitle("");
                 setRate("");
-                setDiscount("");
                 setPromos([]);
                 setImages([]);
                 setCity("");
@@ -193,14 +190,22 @@ const AddListing = () => {
                 <h1 className="text-3xl font-bold text-gray-900 mb-8">Add New Listing</h1>
 
                 {error && (
-                    <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
-                        {error}
+                    <div className="mb-6">
+                        <Alert
+                            type="error"
+                            title="Error Message"
+                            message={error}
+                        />
                     </div>
                 )}
 
                 {success && (
-                    <div className="mb-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg">
-                        {success}
+                    <div className="mb-6">
+                        <Alert
+                            type="success"
+                            title="Success Message"
+                            message={success}
+                        />
                     </div>
                 )}
 
@@ -276,22 +281,6 @@ const AddListing = () => {
                             min="0"
                             step="0.01"
                             required
-                        />
-                    </div>
-
-                    {/* Discount */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Discount (₱)
-                        </label>
-                        <input
-                            type="number"
-                            value={discount}
-                            onChange={(e) => setDiscount(e.target.value)}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="e.g., 20"
-                            min="0"
-                            step="0.01"
                         />
                     </div>
 

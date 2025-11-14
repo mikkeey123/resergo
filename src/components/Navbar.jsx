@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import logo from "../assets/logo.png";
 import Loginmodal from "../auth/Loginmodal";
 import LoginForm from "../auth/LoginForm"; 
@@ -6,8 +7,9 @@ import { FaRegUser, FaSearch, FaCalendarAlt, FaWallet, FaHeart, FaList, FaSignOu
 import { FiMenu } from "react-icons/fi";
 import { auth, getUserData, getUserType } from "../../Config";
 import { onAuthStateChanged } from "firebase/auth";
+import SearchFilter from "./SearchFilter";
 
-const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNavigateToHost, onNavigateToHome, onShowGoogleSignupModal }) => {
+const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNavigateToHost, onNavigateToHome, onShowGoogleSignupModal, onNavigateToFavorites, onNavigateToPayments, onNavigateToBookings, onSearchFilters, searchFilters = {} }) => {
     const [loginOpen, setLoginOpen] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -17,10 +19,13 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
     const isLoggedIn = currentPage === "guest" || currentPage === "host" || currentPage === "userDetails";
     const [user, setUser] = useState(null); // null = not logged in, object with profilePic and username = logged in
     const [userType, setUserType] = useState(null); // 'guest' or 'host' - user type from Firestore
+    const [showSearchFilter, setShowSearchFilter] = useState(false);
     
     // Refs for click outside detection
     const menuRef = useRef(null);
     const userMenuRef = useRef(null);
+    const [menuDropdownPosition, setMenuDropdownPosition] = useState({ top: 0, right: 0 });
+    const [userMenuDropdownPosition, setUserMenuDropdownPosition] = useState({ top: 0, right: 0 });
 
     // Fetch user profile picture, username, and user type from Firestore when logged in
     useEffect(() => {
@@ -83,13 +88,58 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
         };
     }, []);
 
+    // Update dropdown positions when menus open
+    useEffect(() => {
+        if (menuOpen && menuRef.current) {
+            const updatePosition = () => {
+                if (menuRef.current) {
+                    const rect = menuRef.current.getBoundingClientRect();
+                    setMenuDropdownPosition({
+                        top: rect.bottom,
+                        right: window.innerWidth - rect.right
+                    });
+                }
+            };
+            updatePosition();
+            window.addEventListener('scroll', updatePosition, true);
+            window.addEventListener('resize', updatePosition);
+            return () => {
+                window.removeEventListener('scroll', updatePosition, true);
+                window.removeEventListener('resize', updatePosition);
+            };
+        }
+    }, [menuOpen]);
+
+    useEffect(() => {
+        if (userMenuOpen && userMenuRef.current) {
+            const updatePosition = () => {
+                if (userMenuRef.current) {
+                    const rect = userMenuRef.current.getBoundingClientRect();
+                    setUserMenuDropdownPosition({
+                        top: rect.bottom,
+                        right: window.innerWidth - rect.right
+                    });
+                }
+            };
+            updatePosition();
+            window.addEventListener('scroll', updatePosition, true);
+            window.addEventListener('resize', updatePosition);
+            return () => {
+                window.removeEventListener('scroll', updatePosition, true);
+                window.removeEventListener('resize', updatePosition);
+            };
+        }
+    }, [userMenuOpen]);
+
     // Close menu when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
-            if (menuRef.current && !menuRef.current.contains(event.target)) {
+            if (menuRef.current && !menuRef.current.contains(event.target) && 
+                !event.target.closest('.navbar-menu-dropdown')) {
                 setMenuOpen(false);
             }
-            if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+            if (userMenuRef.current && !userMenuRef.current.contains(event.target) && 
+                !event.target.closest('.navbar-user-menu-dropdown')) {
                 setUserMenuOpen(false);
             }
         };
@@ -106,17 +156,7 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
 
                 {/* Left - Logo */}
                 <div 
-                    className="flex items-center cursor-pointer gap-2"
-                    onClick={() => {
-                        if (currentPage === "home") {
-                            const element = document.getElementById("home");
-                            if (element) {
-                                element.scrollIntoView({ behavior: "smooth", block: "start" });
-                            }
-                        } else if (onNavigateToHome) {
-                            onNavigateToHome();
-                        }
-                    }}
+                    className="flex items-center gap-2"
                 > 
                     <img src={logo} alt="ReserGo Logo" className="h-8 w-8" />
                     <h1 className="text-2xl font-bold text-blue-600">
@@ -267,45 +307,68 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
                         </div>
                     </>
                 ) : currentPage !== "host" ? (
-                    <div className="hidden md:flex absolute left-1/2 transform -translate-x-1/2">
+                    <div className="hidden md:flex absolute left-1/2 transform -translate-x-1/2 max-w-[90vw]">
                         <div className="flex items-center bg-white rounded-full border border-gray-200 shadow-md hover:shadow-lg transition duration-200">
                             
                             {/* Search Destination */}
-                            <button className="flex flex-col py-3 px-5 cursor-pointer hover:bg-gray-100 rounded-l-full transition">
-                                <p className="text-sm font-semibold text-gray-700">Where</p>
-                                <p className="text-xs text-gray-500">Search destinations</p>
+                            <button 
+                                onClick={() => setShowSearchFilter(true)}
+                                className="flex flex-col py-2 md:py-3 px-2 md:px-3 lg:px-4 xl:px-5 cursor-pointer hover:bg-gray-100 rounded-l-full transition min-w-0"
+                            >
+                                <p className="text-xs md:text-sm font-semibold text-gray-700 whitespace-nowrap">Where</p>
+                                <p className="text-[10px] md:text-xs text-gray-500 whitespace-nowrap truncate">
+                                    {searchFilters?.location || "Search destinations"}
+                                </p>
                             </button>
                             
                             {/* Vertical Divider */}
-                            <div className="h-8 w-px bg-gray-200"></div>
+                            <div className="h-6 md:h-8 w-px bg-gray-200 flex-shrink-0"></div>
                             
                             {/* Check In */}
-                            <button className="flex flex-col py-3 px-5 cursor-pointer hover:bg-gray-100 transition">
-                                <p className="text-sm font-semibold text-gray-700">Check in</p>
-                                <p className="text-xs text-gray-500">Add dates</p>
+                            <button 
+                                onClick={() => setShowSearchFilter(true)}
+                                className="flex flex-col py-2 md:py-3 px-2 md:px-3 lg:px-4 xl:px-5 cursor-pointer hover:bg-gray-100 transition min-w-0"
+                            >
+                                <p className="text-xs md:text-sm font-semibold text-gray-700 whitespace-nowrap">Check in</p>
+                                <p className="text-[10px] md:text-xs text-gray-500 whitespace-nowrap truncate">
+                                    {searchFilters?.checkIn ? new Date(searchFilters.checkIn).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : "Add dates"}
+                                </p>
                             </button>
 
                             {/* Vertical Divider */}
-                            <div className="h-8 w-px bg-gray-200"></div>
+                            <div className="h-6 md:h-8 w-px bg-gray-200 flex-shrink-0"></div>
 
                             {/* Check Out */}
-                            <button className="flex flex-col py-3 px-5 cursor-pointer hover:bg-gray-100 transition">
-                                <p className="text-sm font-semibold text-gray-700">Check out</p>
-                                <p className="text-xs text-gray-500">Add dates</p>
+                            <button 
+                                onClick={() => setShowSearchFilter(true)}
+                                className="flex flex-col py-2 md:py-3 px-2 md:px-3 lg:px-4 xl:px-5 cursor-pointer hover:bg-gray-100 transition min-w-0"
+                            >
+                                <p className="text-xs md:text-sm font-semibold text-gray-700 whitespace-nowrap">Check out</p>
+                                <p className="text-[10px] md:text-xs text-gray-500 whitespace-nowrap truncate">
+                                    {searchFilters?.checkOut ? new Date(searchFilters.checkOut).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : "Add dates"}
+                                </p>
                             </button>
                             
                             {/* Vertical Divider */}
-                            <div className="h-8 w-px bg-gray-200"></div>
+                            <div className="h-6 md:h-8 w-px bg-gray-200 flex-shrink-0"></div>
                             
                             {/* Who/Guests */}
-                            <button className="flex flex-col py-3 px-5 cursor-pointer hover:bg-gray-100 transition">
-                                <p className="text-sm font-semibold text-gray-700">Who</p>
-                                <p className="text-xs text-gray-500">Add guests</p>
+                            <button 
+                                onClick={() => setShowSearchFilter(true)}
+                                className="flex flex-col py-2 md:py-3 px-2 md:px-3 lg:px-4 xl:px-5 cursor-pointer hover:bg-gray-100 transition min-w-0"
+                            >
+                                <p className="text-xs md:text-sm font-semibold text-gray-700 whitespace-nowrap">Who</p>
+                                <p className="text-[10px] md:text-xs text-gray-500 whitespace-nowrap truncate">
+                                    {searchFilters?.guests ? `${searchFilters.guests} guest${searchFilters.guests > 1 ? 's' : ''}` : "Add guests"}
+                                </p>
                             </button>
                             
                             {/* Search Button (Blue Circle) */}
-                            <button className="p-3 mx-2 bg-blue-600 rounded-full text-white hover:bg-blue-700 transition active:scale-95">
-                                <FaSearch className="text-base" />
+                            <button 
+                                onClick={() => setShowSearchFilter(true)}
+                                className="p-2 md:p-2.5 lg:p-3 mx-1 md:mx-2 bg-blue-600 rounded-full text-white hover:bg-blue-700 transition active:scale-95 flex-shrink-0"
+                            >
+                                <FaSearch className="text-xs md:text-sm lg:text-base" />
                             </button>
                         </div>
                     </div>
@@ -401,21 +464,36 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
                                             <>
                                                 <button 
                                                     className="w-full px-4 py-3 flex items-center gap-3 text-gray-700 hover:bg-gray-50 transition-colors duration-150 text-left"
-                                                    onClick={() => setMenuOpen(false)}
+                                                    onClick={() => {
+                                                        setMenuOpen(false);
+                                                        if (onNavigateToBookings) {
+                                                            onNavigateToBookings();
+                                                        }
+                                                    }}
                                                 >
                                                     <FaCalendarAlt className="text-lg text-gray-500" />
-                                                    <span className="text-sm font-medium">Booking</span>
+                                                    <span className="text-sm font-medium">Bookings</span>
                                                 </button>
                                                 <button 
                                                     className="w-full px-4 py-3 flex items-center gap-3 text-gray-700 hover:bg-gray-50 transition-colors duration-150 text-left"
-                                                    onClick={() => setMenuOpen(false)}
+                                                    onClick={() => {
+                                                        setMenuOpen(false);
+                                                        if (onNavigateToPayments) {
+                                                            onNavigateToPayments();
+                                                        }
+                                                    }}
                                                 >
                                                     <FaWallet className="text-lg text-gray-500" />
                                                     <span className="text-sm font-medium">E-wallet</span>
                                                 </button>
                                                 <button 
                                                     className="w-full px-4 py-3 flex items-center gap-3 text-gray-700 hover:bg-gray-50 transition-colors duration-150 text-left"
-                                                    onClick={() => setMenuOpen(false)}
+                                                    onClick={() => {
+                                                        setMenuOpen(false);
+                                                        if (onNavigateToFavorites) {
+                                                            onNavigateToFavorites();
+                                                        }
+                                                    }}
                                                 >
                                                     <FaHeart className="text-lg text-gray-500" />
                                                     <span className="text-sm font-medium">Favorites</span>
@@ -468,6 +546,20 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
                         onGoogleSignIn={(userInfo) => onShowGoogleSignupModal(userInfo, loginType)}
                     />
                 </Loginmodal>
+
+                {/* Search Filter Modal */}
+                {currentPage !== "host" && currentPage !== "home" && (
+                    <SearchFilter
+                        isOpen={showSearchFilter}
+                        onClose={() => setShowSearchFilter(false)}
+                        onSearch={(filters) => {
+                            if (onSearchFilters) {
+                                onSearchFilters(filters);
+                            }
+                        }}
+                        initialFilters={searchFilters}
+                    />
+                )}
 
             </div>
         </div>

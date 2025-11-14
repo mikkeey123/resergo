@@ -1,9 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { FaChevronLeft, FaChevronRight, FaCalendarAlt } from "react-icons/fa";
+import { auth, getHostBookings } from "../../Config";
 
 const Calendar = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(null);
+    const [bookings, setBookings] = useState([]);
+    const [loading, setLoading] = useState(true);
 
     const monthNames = [
         "January", "February", "March", "April", "May", "June",
@@ -12,12 +15,54 @@ const Calendar = () => {
 
     const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-    // Sample bookings data
-    const bookings = {
-        "2024-01-15": { guest: "John Doe", listing: "Cozy Cabin", status: "confirmed" },
-        "2024-01-20": { guest: "Jane Smith", listing: "Beach Villa", status: "pending" },
-        "2024-01-25": { guest: "Mike Johnson", listing: "Urban Loft", status: "confirmed" },
+    // Fetch bookings on component mount
+    useEffect(() => {
+        const fetchBookings = async () => {
+            if (!auth.currentUser) {
+                setLoading(false);
+                return;
+            }
+            
+            setLoading(true);
+            try {
+                const hostBookings = await getHostBookings(auth.currentUser.uid);
+                setBookings(hostBookings);
+            } catch (error) {
+                console.error("Error fetching bookings for calendar:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchBookings();
+    }, []);
+
+    const formatDateKey = (year, month, day) => {
+        return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     };
+
+    // Convert bookings to date-keyed object
+    const bookingsByDate = {};
+    bookings.forEach(booking => {
+        if (booking.checkIn && booking.status !== "canceled") {
+            const checkInDate = booking.checkIn.toDate();
+            const dateKey = formatDateKey(
+                checkInDate.getFullYear(),
+                checkInDate.getMonth(),
+                checkInDate.getDate()
+            );
+            
+            // If multiple bookings on same date, combine them
+            if (!bookingsByDate[dateKey]) {
+                bookingsByDate[dateKey] = [];
+            }
+            bookingsByDate[dateKey].push({
+                guest: booking.guestName || "Guest",
+                listing: booking.listingTitle || "Listing",
+                status: booking.status === "active" ? "confirmed" : "pending"
+            });
+        }
+    });
 
     const getDaysInMonth = (date) => {
         const year = date.getFullYear();
@@ -47,10 +92,6 @@ const Calendar = () => {
         setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
     };
 
-    const formatDateKey = (year, month, day) => {
-        return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    };
-
     const getDateBooking = (day) => {
         if (!day) return null;
         const dateKey = formatDateKey(
@@ -58,7 +99,14 @@ const Calendar = () => {
             currentDate.getMonth(),
             day
         );
-        return bookings[dateKey] || null;
+        const dateBookings = bookingsByDate[dateKey];
+        if (dateBookings && dateBookings.length > 0) {
+            // Return first booking or combined info if multiple
+            return dateBookings.length === 1 
+                ? dateBookings[0]
+                : { guest: `${dateBookings.length} bookings`, listing: "", status: "confirmed" };
+        }
+        return null;
     };
 
     const handleDateClick = (day) => {
@@ -72,7 +120,7 @@ const Calendar = () => {
     };
 
     const days = getDaysInMonth(currentDate);
-    const selectedBooking = selectedDate ? bookings[selectedDate] : null;
+    const selectedBookings = selectedDate ? bookingsByDate[selectedDate] || [] : [];
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -160,36 +208,50 @@ const Calendar = () => {
                     <h3 className="text-xl font-semibold text-gray-900 mb-4">
                         Booking Details
                     </h3>
-                    {selectedBooking ? (
+                    {loading ? (
+                        <div className="text-center py-8 text-gray-500">
+                            <p className="text-sm">Loading bookings...</p>
+                        </div>
+                    ) : selectedBookings.length > 0 ? (
                         <div className="space-y-4">
                             <div>
                                 <p className="text-sm text-gray-600 mb-1">Date</p>
                                 <p className="font-semibold text-gray-900">
-                                    {new Date(selectedDate).toLocaleDateString()}
+                                    {selectedDate ? new Date(selectedDate).toLocaleDateString('en-US', { 
+                                        year: 'numeric', 
+                                        month: 'long', 
+                                        day: 'numeric' 
+                                    }) : ""}
                                 </p>
                             </div>
-                            <div>
-                                <p className="text-sm text-gray-600 mb-1">Guest</p>
-                                <p className="font-semibold text-gray-900">
-                                    {selectedBooking.guest}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-gray-600 mb-1">Listing</p>
-                                <p className="font-semibold text-gray-900">
-                                    {selectedBooking.listing}
-                                </p>
-                            </div>
-                            <div>
-                                <p className="text-sm text-gray-600 mb-1">Status</p>
-                                <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                                    selectedBooking.status === "confirmed"
-                                        ? "bg-green-100 text-green-700 border border-green-300"
-                                        : "bg-yellow-100 text-yellow-700 border border-yellow-300"
-                                }`}>
-                                    {selectedBooking.status}
-                                </span>
-                            </div>
+                            {selectedBookings.map((booking, index) => (
+                                <div key={index} className="border-t border-gray-200 pt-4 mt-4 first:border-t-0 first:pt-0 first:mt-0">
+                                    <div>
+                                        <p className="text-sm text-gray-600 mb-1">Guest</p>
+                                        <p className="font-semibold text-gray-900">
+                                            {booking.guest}
+                                        </p>
+                                    </div>
+                                    {booking.listing && (
+                                        <div className="mt-2">
+                                            <p className="text-sm text-gray-600 mb-1">Listing</p>
+                                            <p className="font-semibold text-gray-900">
+                                                {booking.listing}
+                                            </p>
+                                        </div>
+                                    )}
+                                    <div className="mt-2">
+                                        <p className="text-sm text-gray-600 mb-1">Status</p>
+                                        <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                                            booking.status === "confirmed"
+                                                ? "bg-green-100 text-green-700 border border-green-300"
+                                                : "bg-yellow-100 text-yellow-700 border border-yellow-300"
+                                        }`}>
+                                            {booking.status === "confirmed" ? "Confirmed" : "Pending"}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     ) : (
                         <div className="text-center py-8 text-gray-500">

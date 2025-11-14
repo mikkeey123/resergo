@@ -6,7 +6,7 @@ import {
     FaPlus, 
     FaComments, 
     FaList, 
-    FaCreditCard, 
+    FaCreditCard,
     FaUser, 
     FaGift,
     FaHome,
@@ -25,7 +25,7 @@ import Coupons from "./Coupons";
 import PaymentMethods from "./PaymentMethods";
 import PointsRewards from "./PointsRewards";
 import UserDetails from "../components/UserDetails";
-import { auth, getUserData, getUserType } from "../../Config";
+import { auth, getUserData, getUserType, getUnreadMessageCount, getHostBookings } from "../../Config";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import logo from "../assets/logo.png";
 
@@ -36,50 +36,126 @@ const Hostpage = () => {
     const [username, setUsername] = useState("");
     const [userType, setUserType] = useState("");
     const [profilePic, setProfilePic] = useState("");
+    const [profilePicError, setProfilePicError] = useState(false);
+    const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+    const [bookings, setBookings] = useState([]);
 
-    // Fetch user data
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                try {
-                    const userData = await getUserData(user.uid);
-                    if (userData) {
-                        setUsername(userData.Username || user.displayName || "");
-                        setProfilePic(userData.ProfilePicture || user.photoURL || "");
-                        const type = await getUserType(user.uid);
-                        setUserType(type || "host");
-                    } else {
-                        setUsername(user.displayName || "");
-                        setProfilePic(user.photoURL || "");
-                        setUserType("host");
-                    }
-                } catch (error) {
-                    console.error("Error fetching user data:", error);
+    // Function to fetch and update user data
+    const fetchUserData = async (user) => {
+        if (user) {
+            try {
+                const userData = await getUserData(user.uid);
+                if (userData) {
+                    const profilePicture = userData.ProfilePicture || user.photoURL || "";
+                    setUsername(userData.Username || user.displayName || "");
+                    setProfilePic(profilePicture);
+                    setProfilePicError(false); // Reset error state when fetching new data
+                    const type = await getUserType(user.uid);
+                    setUserType(type || "host");
+                } else {
                     setUsername(user.displayName || "");
                     setProfilePic(user.photoURL || "");
                     setUserType("host");
                 }
+            } catch (error) {
+                console.error("Error fetching user data:", error);
+                setUsername(user.displayName || "");
+                setProfilePic(user.photoURL || "");
+                setUserType("host");
+            }
+        }
+    };
+
+    // Fetch user data and unread message count
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            await fetchUserData(user);
+            if (user) {
+                // Load unread message count
+                const count = await getUnreadMessageCount(user.uid);
+                setUnreadMessageCount(count);
             }
         });
 
-        return () => unsubscribe();
+        // Listen for profile update events
+        const handleProfileUpdate = async (event) => {
+            console.log("Hostpage: Profile update event received", event.detail);
+            const user = auth.currentUser;
+            if (user) {
+                // Small delay to ensure Firestore has updated
+                setTimeout(async () => {
+                    // Refresh user data from Firestore
+                    await fetchUserData(user);
+                }, 500);
+            }
+        };
+
+        window.addEventListener('profileUpdated', handleProfileUpdate);
+
+        return () => {
+            unsubscribe();
+            window.removeEventListener('profileUpdated', handleProfileUpdate);
+        };
     }, []);
 
-    // Today's data
-    const todayBookings = [
-        { id: 1, guest: "John Doe", listing: "Cozy Mountain Cabin", checkIn: "10:00 AM", checkOut: "2:00 PM", status: "Active" },
-        { id: 2, guest: "Jane Smith", listing: "Beachfront Villa", checkIn: "3:00 PM", checkOut: "11:00 AM", status: "Check-in" },
-        { id: 3, guest: "Mike Johnson", listing: "Urban Loft", checkIn: "Completed", checkOut: "11:00 AM", status: "Check-out" },
-    ];
+    // Poll for unread message count
+    useEffect(() => {
+        const user = auth.currentUser;
+        if (!user) return;
 
-    // Upcoming data
-    const upcomingBookings = [
-        { id: 1, guest: "Sarah Wilson", listing: "Mountain Retreat", date: "2024-01-15", time: "2:00 PM", status: "Confirmed" },
-        { id: 2, guest: "David Brown", listing: "City Center Apartment", date: "2024-01-16", time: "3:00 PM", status: "Confirmed" },
-        { id: 3, guest: "Emily Davis", listing: "Luxury Penthouse", date: "2024-01-17", time: "12:00 PM", status: "Confirmed" },
-        { id: 4, guest: "Robert Taylor", listing: "Beach House", date: "2024-01-18", time: "4:00 PM", status: "Confirmed" },
-        { id: 5, guest: "Lisa Anderson", listing: "Cottage by Lake", date: "2024-01-20", time: "1:00 PM", status: "Confirmed" },
-    ];
+        const interval = setInterval(async () => {
+            const count = await getUnreadMessageCount(user.uid);
+            setUnreadMessageCount(count);
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, []);
+
+    // Fetch bookings for overview
+    useEffect(() => {
+        const fetchBookings = async () => {
+            if (!auth.currentUser || activeTab !== "dashboard") return;
+            
+            try {
+                const hostBookings = await getHostBookings(auth.currentUser.uid);
+                setBookings(hostBookings);
+            } catch (error) {
+                console.error("Error fetching bookings for overview:", error);
+            }
+        };
+
+        fetchBookings();
+    }, [activeTab]);
+
+    // Filter bookings by date
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const todayBookings = bookings.filter(booking => {
+        if (!booking.checkIn || booking.status === "canceled" || booking.status === "pending" || booking.status === "cancel_requested") return false;
+        const checkInDate = booking.checkIn.toDate();
+        checkInDate.setHours(0, 0, 0, 0);
+        return checkInDate.getTime() === today.getTime();
+    });
+
+    const upcomingBookings = bookings.filter(booking => {
+        if (!booking.checkIn || booking.status === "canceled" || booking.status === "pending" || booking.status === "cancel_requested") return false;
+        const checkInDate = booking.checkIn.toDate();
+        checkInDate.setHours(0, 0, 0, 0);
+        return checkInDate.getTime() > today.getTime();
+    });
+
+    const formatTime = (timestamp) => {
+        if (!timestamp) return "N/A";
+        const date = timestamp.toDate();
+        return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    };
+
+    const formatDate = (timestamp) => {
+        if (!timestamp) return "N/A";
+        const date = timestamp.toDate();
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    };
 
     const navigationItems = [
         { id: "dashboard", label: "Overview", icon: <FaHome /> },
@@ -88,7 +164,7 @@ const Hostpage = () => {
         { id: "calendar", label: "Calendar", icon: <FaCalendarAlt /> },
         { id: "bookings", label: "Bookings", icon: <FaCalendar /> },
         { id: "coupons", label: "Coupons", icon: <FaTicketAlt /> },
-        { id: "payments", label: "Payment Method", icon: <FaCreditCard /> },
+        { id: "payments", label: "E-Wallet", icon: <FaCreditCard /> },
         { id: "rewards", label: "Points and Rewards", icon: <FaGift /> },
         { id: "settings", label: "Account", icon: <FaUser /> },
     ];
@@ -138,6 +214,7 @@ const Hostpage = () => {
                 }`}>
                     {navigationItems.map((item) => {
                         const isActive = activeTab === item.id;
+                        const showUnreadBadge = item.id === "messages" && unreadMessageCount > 0;
                         return (
                             <button
                                 key={item.id}
@@ -150,10 +227,15 @@ const Hostpage = () => {
                                         : "text-gray-700 hover:bg-gray-100 hover:text-blue-600 font-medium active:scale-95"
                                 }`}
                             >
-                                <span className={`text-xl flex-shrink-0 transition-colors duration-200 ${
+                                <span className={`text-xl flex-shrink-0 transition-colors duration-200 relative ${
                                     isActive ? 'text-white' : 'text-gray-600'
                                 }`}>
                                     {item.icon}
+                                    {showUnreadBadge && (
+                                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-semibold">
+                                            {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
+                                        </span>
+                                    )}
                                 </span>
                                 <span className={`transition-all duration-300 ease-in-out whitespace-nowrap ${
                                     sidebarOpen ? 'opacity-100 max-w-[200px]' : 'opacity-0 max-w-0 overflow-hidden'
@@ -208,7 +290,7 @@ const Hostpage = () => {
                              activeTab === "calendar" ? "Calendar" :
                              activeTab === "bookings" ? "Bookings" :
                              activeTab === "coupons" ? "Coupons" :
-                             activeTab === "payments" ? "Payment Method" :
+                             activeTab === "payments" ? "E-Wallet" :
                              activeTab === "rewards" ? "Points and Rewards" :
                              activeTab === "settings" ? "Account" : "Dashboard"}
                         </h1>
@@ -220,11 +302,15 @@ const Hostpage = () => {
                                     <p className="text-sm font-semibold text-gray-900">{username}</p>
                                     <p className="text-xs text-gray-600 capitalize">{userType || "host"}</p>
                                 </div>
-                                {profilePic ? (
+                                {profilePic && profilePic.trim() !== "" && !profilePicError ? (
                                     <img 
                                         src={profilePic} 
                                         alt="Profile" 
                                         className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+                                        onError={() => {
+                                            console.error("Error loading profile picture:", profilePic);
+                                            setProfilePicError(true);
+                                        }}
                                     />
                                 ) : (
                                     <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
@@ -270,40 +356,46 @@ const Hostpage = () => {
                             {activeDashboardTab === "today" && (
                                 <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
                                     <h2 className="text-xl font-semibold text-gray-900 mb-6">Today's Bookings</h2>
-                                    <div className="space-y-4">
-                                        {todayBookings.map((booking) => (
-                                            <div
-                                                key={booking.id}
-                                                className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:bg-gray-100 transition"
-                                            >
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <div>
-                                                        <h3 className="font-semibold text-gray-900">{booking.guest}</h3>
-                                                        <p className="text-sm text-gray-600">{booking.listing}</p>
+                                    {todayBookings.length === 0 ? (
+                                        <div className="text-center py-12 text-gray-500">
+                                            <FaCalendarAlt className="text-4xl mx-auto mb-2 text-gray-300" />
+                                            <p>No bookings for today</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {todayBookings.map((booking) => (
+                                                <div
+                                                    key={booking.id}
+                                                    className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:bg-gray-100 transition"
+                                                >
+                                                    <div className="flex justify-between items-start mb-2">
+                                                        <div>
+                                                            <h3 className="font-semibold text-gray-900">{booking.guestName || "Guest"}</h3>
+                                                            <p className="text-sm text-gray-600">{booking.listingTitle || "Listing"}</p>
+                                                            <p className="text-xs text-gray-500 mt-1">{booking.guests} {booking.guests === 1 ? 'guest' : 'guests'}</p>
+                                                        </div>
+                                                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                                            booking.status === "active"
+                                                                ? "bg-green-100 text-green-700 border border-green-300"
+                                                                : "bg-yellow-100 text-yellow-700 border border-yellow-300"
+                                                        }`}>
+                                                            {booking.status === "active" ? "Active" : "Pending"}
+                                                        </span>
                                                     </div>
-                                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                                        booking.status === "Active"
-                                                            ? "bg-green-100 text-green-700 border border-green-300"
-                                                            : booking.status === "Check-in"
-                                                            ? "bg-blue-100 text-blue-700 border border-blue-300"
-                                                            : "bg-orange-100 text-orange-700 border border-orange-300"
-                                                    }`}>
-                                                        {booking.status}
-                                                    </span>
+                                                    <div className="flex gap-6 text-sm text-gray-600 mt-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <FaCheckCircle className="text-blue-600" />
+                                                            <span>Check-in: <span className="font-medium text-gray-900">{formatTime(booking.checkIn)}</span></span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <FaClock className="text-gray-500" />
+                                                            <span>Check-out: <span className="font-medium text-gray-900">{formatTime(booking.checkOut)}</span></span>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <div className="flex gap-6 text-sm text-gray-600 mt-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <FaCheckCircle className="text-blue-600" />
-                                                        <span>Check-in: <span className="font-medium text-gray-900">{booking.checkIn}</span></span>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <FaClock className="text-gray-500" />
-                                                        <span>Check-out: <span className="font-medium text-gray-900">{booking.checkOut}</span></span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -311,38 +403,45 @@ const Hostpage = () => {
                             {activeDashboardTab === "upcomings" && (
                                 <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
                                     <h2 className="text-xl font-semibold text-gray-900 mb-6">Upcoming Bookings</h2>
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full">
-                                            <thead>
-                                                <tr className="border-b border-gray-200">
-                                                    <th className="text-left py-3 px-4 text-gray-700 font-semibold">Guest</th>
-                                                    <th className="text-left py-3 px-4 text-gray-700 font-semibold">Listing</th>
-                                                    <th className="text-left py-3 px-4 text-gray-700 font-semibold">Date</th>
-                                                    <th className="text-left py-3 px-4 text-gray-700 font-semibold">Time</th>
-                                                    <th className="text-left py-3 px-4 text-gray-700 font-semibold">Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {upcomingBookings.map((booking) => (
-                                                    <tr key={booking.id} className="border-b border-gray-100 hover:bg-gray-50">
-                                                        <td className="py-3 px-4 text-gray-900 font-medium">{booking.guest}</td>
-                                                        <td className="py-3 px-4 text-gray-700">{booking.listing}</td>
-                                                        <td className="py-3 px-4 text-gray-700">{booking.date}</td>
-                                                        <td className="py-3 px-4 text-gray-700">{booking.time}</td>
-                                                        <td className="py-3 px-4">
-                                                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                                                booking.status === "Confirmed"
-                                                                    ? "bg-green-100 text-green-700 border border-green-300"
-                                                                    : "bg-yellow-100 text-yellow-700 border border-yellow-300"
-                                                            }`}>
-                                                                {booking.status}
-                                                            </span>
-                                                        </td>
+                                    {upcomingBookings.length === 0 ? (
+                                        <div className="text-center py-12 text-gray-500">
+                                            <FaClock className="text-4xl mx-auto mb-2 text-gray-300" />
+                                            <p>No upcoming bookings</p>
+                                        </div>
+                                    ) : (
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full">
+                                                <thead>
+                                                    <tr className="border-b border-gray-200">
+                                                        <th className="text-left py-3 px-4 text-gray-700 font-semibold">Guest</th>
+                                                        <th className="text-left py-3 px-4 text-gray-700 font-semibold">Listing</th>
+                                                        <th className="text-left py-3 px-4 text-gray-700 font-semibold">Check-in</th>
+                                                        <th className="text-left py-3 px-4 text-gray-700 font-semibold">Check-out</th>
+                                                        <th className="text-left py-3 px-4 text-gray-700 font-semibold">Status</th>
                                                     </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                                </thead>
+                                                <tbody>
+                                                    {upcomingBookings.map((booking) => (
+                                                        <tr key={booking.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                                            <td className="py-3 px-4 text-gray-900 font-medium">{booking.guestName || "Guest"}</td>
+                                                            <td className="py-3 px-4 text-gray-700">{booking.listingTitle || "Listing"}</td>
+                                                            <td className="py-3 px-4 text-gray-700">{formatDate(booking.checkIn)}</td>
+                                                            <td className="py-3 px-4 text-gray-700">{formatDate(booking.checkOut)}</td>
+                                                            <td className="py-3 px-4">
+                                                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                                                    booking.status === "active"
+                                                                        ? "bg-green-100 text-green-700 border border-green-300"
+                                                                        : "bg-yellow-100 text-yellow-700 border border-yellow-300"
+                                                                }`}>
+                                                                    {booking.status === "active" ? "Active" : "Pending"}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -364,7 +463,12 @@ const Hostpage = () => {
 
                     {activeTab === "settings" && (
                         <UserDetails 
-                            onBack={() => {
+                            onBack={async () => {
+                                // Refresh user data when returning from UserDetails
+                                const user = auth.currentUser;
+                                if (user) {
+                                    await fetchUserData(user);
+                                }
                                 // Stay on host page, just switch to dashboard tab
                                 setActiveTab("dashboard");
                             }}

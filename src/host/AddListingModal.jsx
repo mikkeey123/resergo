@@ -1,40 +1,193 @@
-import React, { useState } from "react";
-import { auth, saveListing } from "../../Config";
-import { FaPlus, FaTrash, FaSave, FaTimes } from "react-icons/fa";
+import React, { useState, useEffect } from "react";
+import { auth, saveListing, updateListing } from "../../Config";
+import { FaPlus, FaTrash, FaSave, FaTimes, FaCamera, FaImages, FaWifi, FaTv, FaUtensils, FaTshirt, FaCar, FaDollarSign, FaSnowflake, FaLaptop } from "react-icons/fa";
+import LocationMap from "./components/LocationMap";
+import AlertPopup from "../components/AlertPopup";
+import { compressImages } from "../utils/imageCompression";
 
-const AddListingModal = ({ isOpen, onClose, onSuccess }) => {
+const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) => {
     const [category, setCategory] = useState("Home");
     const [title, setTitle] = useState("");
     const [rate, setRate] = useState("");
-    const [discount, setDiscount] = useState("");
-    const [promos, setPromos] = useState([]);
-    const [promoInput, setPromoInput] = useState("");
-    const [images, setImages] = useState([]);
+    const [images, setImages] = useState([]); // Store image URLs
     const [imageUrl, setImageUrl] = useState("");
+    const [isDragging, setIsDragging] = useState(false);
+    const fileInputRef = React.useRef(null);
     const [city, setCity] = useState("");
     const [address, setAddress] = useState("");
     const [latitude, setLatitude] = useState("");
     const [longitude, setLongitude] = useState("");
     const [description, setDescription] = useState("");
+    const [guests, setGuests] = useState(1);
+    const [bedrooms, setBedrooms] = useState(1);
+    const [beds, setBeds] = useState(1);
+    const [bathrooms, setBathrooms] = useState(1);
     const [amenities, setAmenities] = useState([]);
-    const [amenityInput, setAmenityInput] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
+    
+    // Basic amenities
+    const basicAmenities = [
+        { id: "wifi", label: "Wifi", icon: FaWifi },
+        { id: "tv", label: "TV", icon: FaTv },
+        { id: "kitchen", label: "Kitchen", icon: FaUtensils },
+        { id: "washer", label: "Washer", icon: FaTshirt },
+        { id: "free_parking", label: "Free parking on premises", icon: FaCar },
+        { id: "paid_parking", label: "Paid parking on premises", icon: FaDollarSign },
+        { id: "air_conditioning", label: "Air conditioning", icon: FaSnowflake },
+        { id: "dedicated_workspace", label: "Dedicated workspace", icon: FaLaptop },
+    ];
+    
+    const toggleAmenity = (amenityId) => {
+        if (amenities.includes(amenityId)) {
+            setAmenities(amenities.filter(id => id !== amenityId));
+        } else {
+            setAmenities([...amenities, amenityId]);
+        }
+    };
+    
+    // Auto-dismiss alerts after 2 seconds
+    useEffect(() => {
+        if (error) {
+            const timer = setTimeout(() => {
+                setError("");
+            }, 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [error]);
+    
+    useEffect(() => {
+        if (success) {
+            const timer = setTimeout(() => {
+                setSuccess("");
+            }, 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [success]);
+
+    // Populate form when editing
+    useEffect(() => {
+        if (editingListing && isOpen) {
+            setCategory(editingListing.category || "Home");
+            setTitle(editingListing.title || "");
+            setRate(editingListing.rate?.toString() || "");
+            setImages(editingListing.images || []);
+            setCity(editingListing.location?.city || "");
+            setAddress(editingListing.location?.address || "");
+            setLatitude(editingListing.location?.latitude?.toString() || "");
+            setLongitude(editingListing.location?.longitude?.toString() || "");
+            setDescription(editingListing.description || "");
+            setGuests(editingListing.basics?.guests || 1);
+            setBedrooms(editingListing.basics?.bedrooms || 1);
+            setBeds(editingListing.basics?.beds || 1);
+            setBathrooms(editingListing.basics?.bathrooms || 1);
+            setAmenities(editingListing.amenities || []);
+        } else if (!editingListing && isOpen) {
+            // Reset form when opening for new listing
+            setCategory("Home");
+            setTitle("");
+            setRate("");
+            setImages([]);
+            setCity("");
+            setAddress("");
+            setLatitude("");
+            setLongitude("");
+            setDescription("");
+            setGuests(1);
+            setBedrooms(1);
+            setBeds(1);
+            setBathrooms(1);
+            setAmenities([]);
+            setError("");
+            setSuccess("");
+        }
+    }, [editingListing, isOpen]);
 
     if (!isOpen) return null;
 
-    // Add promo
-    const handleAddPromo = () => {
-        if (promoInput.trim() && !promos.includes(promoInput.trim())) {
-            setPromos([...promos, promoInput.trim()]);
-            setPromoInput("");
+
+    // Handle file selection
+    const handleFileSelect = async (files) => {
+        const fileArray = Array.from(files);
+        const imageFiles = fileArray.filter(file => file.type.startsWith('image/'));
+        
+        if (imageFiles.length === 0) {
+            setError("Please select valid image files");
+            return;
+        }
+        
+        // Limit to 5 images max to stay under Firestore's 1MB limit
+        const MAX_IMAGES = 5;
+        const remainingSlots = MAX_IMAGES - images.length;
+        
+        if (remainingSlots <= 0) {
+            setError(`You can only add up to ${MAX_IMAGES} images per listing to stay within size limits.`);
+            return;
+        }
+        
+        const filesToProcess = imageFiles.slice(0, remainingSlots);
+        if (imageFiles.length > remainingSlots) {
+            setError(`You can only add ${remainingSlots} more image(s). Only the first ${remainingSlots} will be processed.`);
+        }
+        
+        try {
+            setLoading(true);
+            
+            // Aggressively compress images: 600x600px, 50% quality to keep under 1MB limit
+            const compressedDataUrls = await compressImages(filesToProcess, 600, 600, 0.5);
+            
+            // Check total size before adding
+            const currentSize = images.reduce((sum, img) => sum + (img?.length || 0), 0);
+            const newSize = compressedDataUrls.reduce((sum, img) => sum + (img?.length || 0), 0);
+            const totalSize = currentSize + newSize;
+            
+            // Firestore limit is ~1MB (1,048,576 bytes), leave some buffer
+            const MAX_SIZE = 900000; // ~900KB to leave buffer
+            
+            if (totalSize > MAX_SIZE) {
+                setError(`Adding these images would exceed the size limit. Please remove some images or use fewer images. Current size: ${(currentSize / 1024).toFixed(0)}KB, Adding: ${(newSize / 1024).toFixed(0)}KB`);
+                setLoading(false);
+                return;
+            }
+            
+            // Store compressed data URLs (these will be saved to Firestore and persist)
+            setImages(prevImages => [...prevImages, ...compressedDataUrls]);
+            setError(""); // Clear any previous errors
+        } catch (error) {
+            console.error("Error processing images:", error);
+            setError("Failed to process images. Please try again.");
+        } finally {
+            setLoading(false);
         }
     };
 
-    // Remove promo
-    const handleRemovePromo = (index) => {
-        setPromos(promos.filter((_, i) => i !== index));
+    // Handle drag and drop
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+    };
+
+    const handleDrop = async (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            await handleFileSelect(files);
+        }
+    };
+
+    // Handle file input change
+    const handleFileInputChange = async (e) => {
+        const files = e.target.files;
+        if (files && files.length > 0) {
+            await handleFileSelect(files);
+        }
     };
 
     // Add image URL
@@ -50,32 +203,29 @@ const AddListingModal = ({ isOpen, onClose, onSuccess }) => {
         setImages(images.filter((_, i) => i !== index));
     };
 
-    // Add amenity
-    const handleAddAmenity = () => {
-        if (amenityInput.trim() && !amenities.includes(amenityInput.trim())) {
-            setAmenities([...amenities, amenityInput.trim()]);
-            setAmenityInput("");
-        }
+    // Set cover photo (first image)
+    const setCoverPhoto = (index) => {
+        const newImages = [...images];
+        const [coverImage] = newImages.splice(index, 1);
+        setImages([coverImage, ...newImages]);
     };
 
-    // Remove amenity
-    const handleRemoveAmenity = (index) => {
-        setAmenities(amenities.filter((_, i) => i !== index));
-    };
 
     // Reset form
     const resetForm = () => {
         setCategory("Home");
         setTitle("");
         setRate("");
-        setDiscount("");
-        setPromos([]);
         setImages([]);
         setCity("");
         setAddress("");
         setLatitude("");
         setLongitude("");
         setDescription("");
+        setGuests(1);
+        setBedrooms(1);
+        setBeds(1);
+        setBathrooms(1);
         setAmenities([]);
         setError("");
         setSuccess("");
@@ -98,8 +248,6 @@ const AddListingModal = ({ isOpen, onClose, onSuccess }) => {
                 category,
                 title,
                 rate: parseFloat(rate) || 0,
-                discount: parseFloat(discount) || 0,
-                promos,
                 images,
                 location: {
                     city,
@@ -108,12 +256,25 @@ const AddListingModal = ({ isOpen, onClose, onSuccess }) => {
                     longitude: parseFloat(longitude) || 0
                 },
                 description,
+                basics: {
+                    guests,
+                    bedrooms,
+                    beds,
+                    bathrooms
+                },
                 amenities,
                 availability: {}
             };
 
-            await saveListing(user.uid, listingData, true);
-            setSuccess("Listing saved as draft successfully!");
+            if (editingListing) {
+                // Update existing listing
+                await updateListing(editingListing.id, { ...listingData, isDraft: true });
+                setSuccess("Listing updated as draft successfully!");
+            } else {
+                // Create new listing
+                await saveListing(user.uid, listingData, true);
+                setSuccess("Listing saved as draft successfully!");
+            }
             
             setTimeout(() => {
                 resetForm();
@@ -156,6 +317,11 @@ const AddListingModal = ({ isOpen, onClose, onSuccess }) => {
             setLoading(false);
             return;
         }
+        if (!images || images.length !== 5) {
+            setError("Exactly 5 images are required to publish a listing");
+            setLoading(false);
+            return;
+        }
 
         try {
             const user = auth.currentUser;
@@ -167,8 +333,6 @@ const AddListingModal = ({ isOpen, onClose, onSuccess }) => {
                 category,
                 title,
                 rate: parseFloat(rate) || 0,
-                discount: parseFloat(discount) || 0,
-                promos,
                 images,
                 location: {
                     city,
@@ -177,12 +341,25 @@ const AddListingModal = ({ isOpen, onClose, onSuccess }) => {
                     longitude: parseFloat(longitude) || 0
                 },
                 description,
+                basics: {
+                    guests,
+                    bedrooms,
+                    beds,
+                    bathrooms
+                },
                 amenities,
                 availability: {}
             };
 
-            await saveListing(user.uid, listingData, false);
-            setSuccess("Listing published successfully!");
+            if (editingListing) {
+                // Update existing listing
+                await updateListing(editingListing.id, { ...listingData, isDraft: false });
+                setSuccess("Listing updated successfully!");
+            } else {
+                // Create new listing
+                await saveListing(user.uid, listingData, false);
+                setSuccess("Listing published successfully!");
+            }
             
             setTimeout(() => {
                 resetForm();
@@ -198,14 +375,17 @@ const AddListingModal = ({ isOpen, onClose, onSuccess }) => {
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" style={{ zIndex: 50 }}>
             <div 
-                className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto border border-gray-200"
+                className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] border border-gray-200 relative flex flex-col overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
+                style={{ zIndex: 51 }}
             >
-                {/* Modal Header */}
-                <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
-                    <h2 className="text-2xl font-bold text-gray-900">Add New Listing</h2>
+                {/* Modal Header - Fixed, not scrollable */}
+                <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+                    <h2 className="text-2xl font-bold text-gray-900">
+                        {editingListing ? "Edit Listing" : "Add New Listing"}
+                    </h2>
                     <button
                         onClick={onClose}
                         className="text-gray-600 hover:text-gray-900 transition-colors p-2 rounded-lg hover:bg-gray-100"
@@ -214,19 +394,17 @@ const AddListingModal = ({ isOpen, onClose, onSuccess }) => {
                     </button>
                 </div>
 
-                {/* Modal Content */}
-                <div className="p-6">
-                    {error && (
-                        <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg">
-                            {error}
-                        </div>
-                    )}
-
-                    {success && (
-                        <div className="mb-6 p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg">
-                            {success}
-                        </div>
-                    )}
+                {/* Modal Content - Scrollable area */}
+                <div className="flex-1 overflow-y-auto">
+                    <div className="p-6">
+                    {/* Alerts as Popups - Auto-dismiss after 2 seconds */}
+                    <AlertPopup
+                        type={error ? "error" : "success"}
+                        title={error ? "Error Message" : "Success Message"}
+                        message={error || success}
+                        isOpen={!!(error || success)}
+                        dismissible={false}
+                    />
 
                     <form onSubmit={handlePublish} className="space-y-6">
                         {/* Category Selection */}
@@ -252,6 +430,151 @@ const AddListingModal = ({ isOpen, onClose, onSuccess }) => {
                             </div>
                         </div>
 
+                        {/* Images Section */}
+                        <div>
+                            <h3 className="text-2xl font-bold text-gray-900 mb-2">Add some photos of your house</h3>
+                            <p className="text-gray-600 mb-2">Add photos to showcase your listing. <span className="font-semibold text-red-600">Exactly 5 images are required</span> to publish a listing.</p>
+                            <p className="text-sm text-blue-600 mb-6 font-medium">
+                                {images.length > 0 
+                                    ? `${images.length}/5 images added. ${images.length < 5 ? `You need to add ${5 - images.length} more image(s) to publish.` : 'All 5 images added. Ready to publish!'} Images are automatically compressed to reduce size.`
+                                    : 'You need to add 5 images. You can select up to 5 images at once from your device. Images will be automatically compressed to 600x600px at 50% quality.'}
+                            </p>
+                            
+                            {/* Upload Area */}
+                            {images.length === 0 ? (
+                                <div
+                                    onDragOver={handleDragOver}
+                                    onDragLeave={handleDragLeave}
+                                    onDrop={handleDrop}
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${
+                                        isDragging 
+                                            ? "border-blue-600 bg-blue-50" 
+                                            : "border-gray-300 bg-gray-50 hover:border-gray-400 hover:bg-gray-100"
+                                    }`}
+                                >
+                                    <div className="flex flex-col items-center gap-4">
+                                        <FaCamera className="text-6xl text-gray-400" />
+                                        <div>
+                                            <button
+                                                type="button"
+                                                className="px-6 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 transition font-medium"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    fileInputRef.current?.click();
+                                                }}
+                                            >
+                                                Add photos
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        multiple
+                                        onChange={handleFileInputChange}
+                                        className="hidden"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-2">Select up to 5 images at once</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {/* Cover Photo */}
+                                    {images.length > 0 && (
+                                        <div>
+                                            <div className="relative group">
+                                                <div className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded z-10">
+                                                    Cover Photo
+                                                </div>
+                                                <img
+                                                    src={images[0]}
+                                                    alt="Cover"
+                                                    className="w-full h-64 object-cover rounded-lg border-2 border-gray-300"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRemoveImage(0)}
+                                                    className="absolute top-2 right-2 bg-black/70 text-white p-2 rounded-full hover:bg-black/90 transition opacity-0 group-hover:opacity-100"
+                                                >
+                                                    <FaTrash className="text-sm" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Image Grid */}
+                                    {images.length > 1 && (
+                                        <div>
+                                            <p className="text-sm text-gray-600 mb-3">Drag to reorder</p>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                {images.slice(1).map((image, index) => (
+                                                    <div key={index + 1} className="relative group">
+                                                        <img
+                                                            src={image}
+                                                            alt={`Photo ${index + 2}`}
+                                                            className="w-full h-32 object-cover rounded-lg border border-gray-300"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveImage(index + 1)}
+                                                            className="absolute top-2 right-2 bg-black/70 text-white p-1.5 rounded-full hover:bg-black/90 transition opacity-0 group-hover:opacity-100"
+                                                        >
+                                                            <FaTrash className="text-xs" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setCoverPhoto(index + 1)}
+                                                            className="absolute top-2 left-2 bg-black/70 text-white text-xs px-2 py-1 rounded hover:bg-black/90 transition opacity-0 group-hover:opacity-100"
+                                                        >
+                                                            Set as cover
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Add More Button */}
+                                    <div
+                                        onDragOver={handleDragOver}
+                                        onDragLeave={handleDragLeave}
+                                        onDrop={handleDrop}
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                                            isDragging 
+                                                ? "border-blue-600 bg-blue-50" 
+                                                : "border-gray-300 bg-gray-50 hover:border-gray-400 hover:bg-gray-100"
+                                        }`}
+                                    >
+                                        <div className="flex flex-col items-center gap-2">
+                                            <FaImages className="text-3xl text-gray-400" />
+                                            <p className="text-gray-700 font-medium">Drag and drop</p>
+                                            <p className="text-sm text-gray-500">or browse for photos</p>
+                                            <button
+                                                type="button"
+                                                className="mt-2 px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition font-medium"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    fileInputRef.current?.click();
+                                                }}
+                                            >
+                                                Browse
+                                            </button>
+                                        </div>
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            accept="image/*"
+                                            multiple
+                                            onChange={handleFileInputChange}
+                                            className="hidden"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         {/* Title */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -267,191 +590,109 @@ const AddListingModal = ({ isOpen, onClose, onSuccess }) => {
                             />
                         </div>
 
-                        {/* Rate and Discount */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Rate (₱) *
-                                </label>
-                                <input
-                                    type="number"
-                                    value={rate}
-                                    onChange={(e) => setRate(e.target.value)}
-                                    className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
-                                    placeholder="e.g., 150"
-                                    min="0"
-                                    step="0.01"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Discount (₱)
-                                </label>
-                                <input
-                                    type="number"
-                                    value={discount}
-                                    onChange={(e) => setDiscount(e.target.value)}
-                                    className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
-                                    placeholder="e.g., 20"
-                                    min="0"
-                                    step="0.01"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Promos */}
+                        {/* Rate */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Promos
+                                Rate (₱) *
                             </label>
-                            <div className="flex gap-2 mb-2">
-                                <input
-                                    type="text"
-                                    value={promoInput}
-                                    onChange={(e) => setPromoInput(e.target.value)}
-                                    onKeyPress={(e) => {
-                                        if (e.key === "Enter") {
-                                            e.preventDefault();
-                                            handleAddPromo();
-                                        }
-                                    }}
-                                    className="flex-1 px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
-                                    placeholder="Enter promo and press Enter"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={handleAddPromo}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md"
-                                >
-                                    <FaPlus />
-                                </button>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {promos.map((promo, index) => (
-                                    <span
-                                        key={index}
-                                        className="inline-flex items-center gap-2 px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm border border-blue-200"
-                                    >
-                                        {promo}
-                                        <button
-                                            type="button"
-                                            onClick={() => handleRemovePromo(index)}
-                                            className="text-blue-600 hover:text-blue-800"
-                                        >
-                                            <FaTrash className="text-xs" />
-                                        </button>
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Images */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Images (URLs)
-                            </label>
-                            <div className="flex gap-2 mb-2">
-                                <input
-                                    type="url"
-                                    value={imageUrl}
-                                    onChange={(e) => setImageUrl(e.target.value)}
-                                    onKeyPress={(e) => {
-                                        if (e.key === "Enter") {
-                                            e.preventDefault();
-                                            handleAddImage();
-                                        }
-                                    }}
-                                    className="flex-1 px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
-                                    placeholder="Enter image URL and press Enter"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={handleAddImage}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md"
-                                >
-                                    <FaPlus />
-                                </button>
-                            </div>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                {images.map((image, index) => (
-                                    <div key={index} className="relative">
-                                        <img
-                                            src={image}
-                                            alt={`Listing ${index + 1}`}
-                                            className="w-full h-32 object-cover rounded-lg border border-gray-300"
-                                            onError={(e) => {
-                                                e.target.style.display = "none";
-                                            }}
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={() => handleRemoveImage(index)}
-                                            className="absolute top-2 right-2 p-1 bg-red-600 text-white rounded-full hover:bg-red-700 shadow-md"
-                                        >
-                                            <FaTrash className="text-xs" />
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
+                            <input
+                                type="number"
+                                value={rate}
+                                onChange={(e) => setRate(e.target.value)}
+                                className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+                                placeholder="e.g., 150"
+                                min="0"
+                                step="0.01"
+                                required
+                            />
                         </div>
 
                         {/* Location */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    City *
-                                </label>
-                                <input
-                                    type="text"
-                                    value={city}
-                                    onChange={(e) => setCity(e.target.value)}
-                                    className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
-                                    placeholder="e.g., Manila"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Address *
-                                </label>
-                                <input
-                                    type="text"
-                                    value={address}
-                                    onChange={(e) => setAddress(e.target.value)}
-                                    className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
-                                    placeholder="e.g., 123 Main Street"
-                                    required
-                                />
-                            </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Location * (Search or click on map)
+                            </label>
+                            <LocationMap
+                                latitude={latitude}
+                                longitude={longitude}
+                                city={city}
+                                address={address}
+                                onLocationChange={(location) => {
+                                    setLatitude(location.latitude.toString());
+                                    setLongitude(location.longitude.toString());
+                                    if (location.city) setCity(location.city);
+                                    if (location.address) setAddress(location.address);
+                                }}
+                            />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Latitude
-                                </label>
-                                <input
-                                    type="number"
-                                    value={latitude}
-                                    onChange={(e) => setLatitude(e.target.value)}
-                                    className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
-                                    placeholder="e.g., 14.5995"
-                                    step="any"
-                                />
+                        {/* Location Details */}
+                        <div className="space-y-4">
+                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                <h3 className="text-sm font-semibold text-gray-700 mb-3">Location Details</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-600 mb-1">
+                                            City *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={city}
+                                            onChange={(e) => setCity(e.target.value)}
+                                            className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+                                            placeholder="e.g., Manila"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-600 mb-1">
+                                            Address *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={address}
+                                            onChange={(e) => setAddress(e.target.value)}
+                                            className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+                                            placeholder="e.g., 123 Main Street"
+                                            required
+                                        />
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Longitude
-                                </label>
-                                <input
-                                    type="number"
-                                    value={longitude}
-                                    onChange={(e) => setLongitude(e.target.value)}
-                                    className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
-                                    placeholder="e.g., 120.9842"
-                                    step="any"
-                                />
+                            
+                            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                                <h3 className="text-sm font-semibold text-blue-700 mb-3">Coordinates (Auto-filled)</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-blue-600 mb-1">
+                                            Latitude
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={latitude}
+                                            readOnly
+                                            className="w-full px-4 py-2 bg-white border border-blue-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400 cursor-not-allowed"
+                                            placeholder="Auto-filled from map"
+                                            step="any"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-blue-600 mb-1">
+                                            Longitude
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={longitude}
+                                            readOnly
+                                            className="w-full px-4 py-2 bg-white border border-blue-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400 cursor-not-allowed"
+                                            placeholder="Auto-filled from map"
+                                            step="any"
+                                        />
+                                    </div>
+                                </div>
+                                <p className="text-xs text-blue-600 mt-2">
+                                    These coordinates are automatically updated when you select a location on the map.
+                                </p>
                             </div>
                         </div>
 
@@ -470,49 +711,138 @@ const AddListingModal = ({ isOpen, onClose, onSuccess }) => {
                             />
                         </div>
 
-                        {/* Amenities */}
+                        {/* Basics */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Amenities
-                            </label>
-                            <div className="flex gap-2 mb-2">
-                                <input
-                                    type="text"
-                                    value={amenityInput}
-                                    onChange={(e) => setAmenityInput(e.target.value)}
-                                    onKeyPress={(e) => {
-                                        if (e.key === "Enter") {
-                                            e.preventDefault();
-                                            handleAddAmenity();
-                                        }
-                                    }}
-                                    className="flex-1 px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
-                                    placeholder="e.g., Wi-Fi, Pool, Parking"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={handleAddAmenity}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md"
-                                >
-                                    <FaPlus />
-                                </button>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {amenities.map((amenity, index) => (
-                                    <span
-                                        key={index}
-                                        className="inline-flex items-center gap-2 px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm border border-gray-300"
-                                    >
-                                        {amenity}
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">Share some basics about your place</h3>
+                            <p className="text-sm text-gray-600 mb-4">You'll add more details later, like bed types.</p>
+                            
+                            <div className="space-y-4">
+                                {/* Guests */}
+                                <div className="flex items-center justify-between py-3 border-b border-gray-200">
+                                    <div>
+                                        <label className="text-base font-medium text-gray-900">Guests</label>
+                                    </div>
+                                    <div className="flex items-center gap-4">
                                         <button
                                             type="button"
-                                            onClick={() => handleRemoveAmenity(index)}
-                                            className="text-gray-600 hover:text-gray-900"
+                                            onClick={() => setGuests(Math.max(1, guests - 1))}
+                                            className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
-                                            <FaTrash className="text-xs" />
+                                            <span className="text-gray-600">−</span>
                                         </button>
-                                    </span>
-                                ))}
+                                        <span className="text-lg font-medium text-gray-900 w-8 text-center">{guests}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setGuests(guests + 1)}
+                                            className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition"
+                                        >
+                                            <span className="text-gray-600">+</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Bedrooms */}
+                                <div className="flex items-center justify-between py-3 border-b border-gray-200">
+                                    <div>
+                                        <label className="text-base font-medium text-gray-900">Bedrooms</label>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setBedrooms(Math.max(1, bedrooms - 1))}
+                                            className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <span className="text-gray-600">−</span>
+                                        </button>
+                                        <span className="text-lg font-medium text-gray-900 w-8 text-center">{bedrooms}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setBedrooms(bedrooms + 1)}
+                                            className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition"
+                                        >
+                                            <span className="text-gray-600">+</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Beds */}
+                                <div className="flex items-center justify-between py-3 border-b border-gray-200">
+                                    <div>
+                                        <label className="text-base font-medium text-gray-900">Beds</label>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setBeds(Math.max(1, beds - 1))}
+                                            disabled={beds <= 1}
+                                            className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <span className="text-gray-600">−</span>
+                                        </button>
+                                        <span className="text-lg font-medium text-gray-900 w-8 text-center">{beds}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setBeds(beds + 1)}
+                                            className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition"
+                                        >
+                                            <span className="text-gray-600">+</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Bathrooms */}
+                                <div className="flex items-center justify-between py-3 border-b border-gray-200">
+                                    <div>
+                                        <label className="text-base font-medium text-gray-900">Bathrooms</label>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setBathrooms(Math.max(1, bathrooms - 1))}
+                                            className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <span className="text-gray-600">−</span>
+                                        </button>
+                                        <span className="text-lg font-medium text-gray-900 w-8 text-center">{bathrooms}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setBathrooms(bathrooms + 1)}
+                                            className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-gray-400 transition"
+                                        >
+                                            <span className="text-gray-600">+</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Amenities */}
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4">What about these guest favorites?</h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                                {basicAmenities.map((amenity) => {
+                                    const Icon = amenity.icon;
+                                    const isSelected = amenities.includes(amenity.id);
+                                    return (
+                                        <button
+                                            key={amenity.id}
+                                            type="button"
+                                            onClick={() => toggleAmenity(amenity.id)}
+                                            className={`p-4 border-2 rounded-lg transition-all duration-200 ${
+                                                isSelected
+                                                    ? "border-blue-600 bg-blue-50"
+                                                    : "border-gray-300 bg-white hover:border-gray-400"
+                                            }`}
+                                        >
+                                            <div className="flex flex-col items-center gap-2">
+                                                <Icon className={`text-2xl ${isSelected ? "text-blue-600" : "text-gray-700"}`} />
+                                                <span className={`text-sm text-center ${isSelected ? "text-blue-700 font-medium" : "text-gray-700"}`}>
+                                                    {amenity.label}
+                                                </span>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
 
@@ -529,13 +859,15 @@ const AddListingModal = ({ isOpen, onClose, onSuccess }) => {
                             </button>
                             <button
                                 type="submit"
-                                disabled={loading}
+                                disabled={loading || (!editingListing && (!images || images.length !== 5))}
                                 className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-md"
+                                title={!editingListing && (!images || images.length !== 5) ? "5 images are required to publish" : ""}
                             >
-                                {loading ? "Publishing..." : "Publish Listing"}
+                                {loading ? (editingListing ? "Updating..." : "Publishing...") : (editingListing ? "Update Listing" : "Publish Listing")}
                             </button>
                         </div>
                     </form>
+                    </div>
                 </div>
             </div>
         </div>

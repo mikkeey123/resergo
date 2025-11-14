@@ -19,6 +19,13 @@ dist-ssr
 .env.production
 .env.development
 
+# EmailJS configuration (optional - can use env vars)
+# Uncomment if you want to keep EmailJS keys in .env instead of hardcoding
+# VITE_EMAILJS_PUBLIC_KEY
+# VITE_EMAILJS_SERVICE_ID
+# VITE_EMAILJS_TEMPLATE_ID_GUEST
+# VITE_EMAILJS_TEMPLATE_ID_HOST
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
