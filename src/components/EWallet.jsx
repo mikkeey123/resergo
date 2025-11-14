@@ -18,13 +18,21 @@ const WithdrawModal = React.memo(({
     onSubmit 
 }) => {
     const emailInputRef = useRef(null);
+    const amountInputRef = useRef(null);
+    const hasFocusedOnMount = useRef(false);
 
-    // Focus email input when modal opens
+    // Focus amount input only when modal first opens
     useEffect(() => {
-        if (showWithdrawModal && emailInputRef.current) {
+        if (showWithdrawModal && amountInputRef.current && !hasFocusedOnMount.current) {
             setTimeout(() => {
-                emailInputRef.current?.focus();
+                amountInputRef.current?.focus();
+                hasFocusedOnMount.current = true;
             }, 100);
+        }
+        
+        // Reset focus flag when modal closes
+        if (!showWithdrawModal) {
+            hasFocusedOnMount.current = false;
         }
     }, [showWithdrawModal]);
 
@@ -60,6 +68,7 @@ const WithdrawModal = React.memo(({
                             Amount (₱)
                         </label>
                         <input
+                            ref={amountInputRef}
                             type="number"
                             value={withdrawAmount}
                             onChange={onAmountChange}
