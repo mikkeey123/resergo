@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from "react";
 import { FaWallet, FaPaypal, FaArrowUp, FaArrowDown, FaHistory, FaTimes, FaCheckCircle } from "react-icons/fa";
 import { auth, getWalletBalance, topUpWallet, withdrawFromWallet, getTransactionHistory } from "../../Config";
 import { onAuthStateChanged } from "firebase/auth";
@@ -20,6 +20,8 @@ const WithdrawModal = React.memo(({
     const emailInputRef = useRef(null);
     const amountInputRef = useRef(null);
     const hasFocusedOnMount = useRef(false);
+    const emailWasFocusedRef = useRef(false);
+    const emailCursorPositionRef = useRef(null);
 
     // Focus amount input only when modal first opens
     useEffect(() => {
@@ -35,6 +37,18 @@ const WithdrawModal = React.memo(({
             hasFocusedOnMount.current = false;
         }
     }, [showWithdrawModal]);
+
+    // Preserve focus on email input when typing - restore after render
+    useLayoutEffect(() => {
+        if (showWithdrawModal && emailInputRef.current && emailWasFocusedRef.current) {
+            emailInputRef.current.focus();
+            // Restore cursor position if we have it
+            if (emailCursorPositionRef.current !== null) {
+                const position = emailCursorPositionRef.current;
+                emailInputRef.current.setSelectionRange(position, position);
+            }
+        }
+    });
 
     if (!showWithdrawModal) return null;
 
@@ -92,7 +106,18 @@ const WithdrawModal = React.memo(({
                             ref={emailInputRef}
                             type="email"
                             value={withdrawEmail}
-                            onChange={onEmailChange}
+                            onChange={(e) => {
+                                // Track focus state before onChange
+                                emailWasFocusedRef.current = document.activeElement === emailInputRef.current;
+                                emailCursorPositionRef.current = emailInputRef.current?.selectionStart || null;
+                                onEmailChange(e);
+                            }}
+                            onFocus={() => {
+                                emailWasFocusedRef.current = true;
+                            }}
+                            onBlur={() => {
+                                emailWasFocusedRef.current = false;
+                            }}
                             className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 transition"
                             placeholder="your.email@example.com"
                             required
