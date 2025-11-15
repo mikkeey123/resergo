@@ -2790,4 +2790,4 @@ export const getFeeStatistics = async () => {
     }
 };
 
-export { auth, db, googleProvider, handleGoogleSignup, checkUserExists, checkAccountComplete, saveGoogleUserData, saveAdminUserData, saveHostUserData, getUserData, getUserType, updatePasswordInFirestore, verifyPassword, updateProfilePicture, updateUserProfile, updateUserType, linkEmailPasswordToGoogleAccount, saveListing, updateListing, getListing, deleteListing, getHostListings, getPublishedListings, saveReview, getListingReviews, updateListingRating, updateReview, savePlatformFeePercentage, getPlatformFeePercentage, getFeeTransactions, getFeeStatistics };
+export { auth, db, googleProvider, handleGoogleSignup, checkUserExists, checkAccountComplete, saveGoogleUserData, saveAdminUserData, saveHostUserData, getUserData, getUserType, updatePasswordInFirestore, verifyPassword, updateProfilePicture, updateUserProfile, updateUserType, linkEmailPasswordToGoogleAccount, saveListing, updateListing, getListing, deleteListing, getHostListings, getPublishedListings, saveReview, getListingReviews, updateListingRating, updateReview };
