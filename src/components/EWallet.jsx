@@ -5,34 +5,33 @@ import { onAuthStateChanged } from "firebase/auth";
 import { PayPalScriptProvider, PayPalButtons, usePayPalScriptReducer } from "@paypal/react-paypal-js";
 import { PAYPAL_CONFIG, paypalSdkOptions, isPayPalConfigured } from "../config/paypal";
 
-// Withdraw Modal Component - Memoized to prevent re-renders
+// Withdraw Modal Component - Fully isolated to prevent re-renders
 const WithdrawModal = React.memo(({ 
     showWithdrawModal, 
-    withdrawAmount, 
-    withdrawEmail, 
     balance, 
     processing, 
     onClose, 
-    onAmountChange, 
-    onEmailChange, 
     onSubmit 
 }) => {
     const emailInputRef = useRef(null);
+    const amountInputRef = useRef(null);
 
-    // Sync ref value with prop value only when modal first opens
+    // Reset inputs when modal opens/closes
     useEffect(() => {
-        if (showWithdrawModal && emailInputRef.current) {
-            // Only set if different to avoid unnecessary updates
-            if (emailInputRef.current.value !== (withdrawEmail || "")) {
-                emailInputRef.current.value = withdrawEmail || "";
-            }
+        if (showWithdrawModal) {
+            // Clear inputs when modal opens
+            if (emailInputRef.current) emailInputRef.current.value = "";
+            if (amountInputRef.current) amountInputRef.current.value = "";
         }
-    }, [showWithdrawModal]); // Only depend on showWithdrawModal
+    }, [showWithdrawModal]);
 
-    // Handle email input change - update parent state
-    const handleEmailChange = useCallback((e) => {
-        onEmailChange(e);
-    }, [onEmailChange]);
+    // Handle form submission - read values from refs
+    const handleSubmit = useCallback((e) => {
+        e.preventDefault();
+        const amount = amountInputRef.current?.value || "";
+        const email = emailInputRef.current?.value || "";
+        onSubmit({ amount, email });
+    }, [onSubmit]);
 
     if (!showWithdrawModal) return null;
 
@@ -60,15 +59,14 @@ const WithdrawModal = React.memo(({
                         <FaTimes className="text-xl" />
                     </button>
                 </div>
-                <form onSubmit={onSubmit} className="p-6 space-y-5">
+                <form onSubmit={handleSubmit} className="p-6 space-y-5">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             Amount (₱)
                         </label>
                         <input
+                            ref={amountInputRef}
                             type="number"
-                            value={withdrawAmount}
-                            onChange={onAmountChange}
                             className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 transition"
                             placeholder="Enter amount"
                             min="1"
@@ -88,8 +86,6 @@ const WithdrawModal = React.memo(({
                         <input
                             ref={emailInputRef}
                             type="email"
-                            defaultValue={withdrawEmail || ""}
-                            onChange={handleEmailChange}
                             className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 transition"
                             placeholder="your.email@example.com"
                             required
@@ -124,18 +120,13 @@ const WithdrawModal = React.memo(({
         </div>
     );
 }, (prevProps, nextProps) => {
-    // Custom comparison: only re-render if props that affect rendering change
-    // Don't re-render just because withdrawEmail changed (it's uncontrolled)
+    // Only re-render if essential props change
     return (
         prevProps.showWithdrawModal === nextProps.showWithdrawModal &&
-        prevProps.withdrawAmount === nextProps.withdrawAmount &&
         prevProps.balance === nextProps.balance &&
         prevProps.processing === nextProps.processing &&
         prevProps.onClose === nextProps.onClose &&
-        prevProps.onAmountChange === nextProps.onAmountChange &&
-        prevProps.onEmailChange === nextProps.onEmailChange &&
         prevProps.onSubmit === nextProps.onSubmit
-        // Intentionally NOT comparing withdrawEmail to prevent re-renders
     );
 });
 
@@ -343,30 +334,21 @@ const EWallet = ({ userId = null }) => {
         // PayPal button will handle the rest
     };
 
-    // Memoize handlers to prevent unnecessary re-renders
-    const handleWithdrawAmountChange = useCallback((e) => {
-        setWithdrawAmount(e.target.value);
-    }, []);
-
-    const handleWithdrawEmailChange = useCallback((e) => {
-        setWithdrawEmail(e.target.value);
-    }, []);
-
     const handleWithdrawClose = useCallback(() => {
         setShowWithdrawModal(false);
+        // Reset form state when closing
+        setWithdrawAmount("");
+        setWithdrawEmail("");
     }, []);
 
-    // Handle withdrawal - need to get email from ref since it's uncontrolled
-    const handleWithdraw = async (e) => {
-        e.preventDefault();
-        if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) {
+    // Handle withdrawal - receive values from modal refs
+    const handleWithdraw = useCallback(async ({ amount, email }) => {
+        if (!amount || parseFloat(amount) <= 0) {
             alert("Please enter a valid amount");
             return;
         }
 
-        // Get email from state (it's updated via onChange)
-        const emailValue = withdrawEmail;
-        if (!emailValue || !emailValue.includes("@")) {
+        if (!email || !email.includes("@")) {
             alert("Please enter a valid PayPal email address");
             return;
         }
@@ -374,13 +356,13 @@ const EWallet = ({ userId = null }) => {
         setProcessing(true);
         try {
             const targetUserId = userId || currentUserId;
-            const amount = parseFloat(withdrawAmount);
+            const amountValue = parseFloat(amount);
             
             const result = await withdrawFromWallet(
                 targetUserId,
-                amount,
+                amountValue,
                 "paypal",
-                { email: emailValue }
+                { email }
             );
             
             setBalance(result.newBalance);
@@ -390,14 +372,14 @@ const EWallet = ({ userId = null }) => {
             // Reload transaction history
             const history = await getTransactionHistory(targetUserId);
             setTransactions(history);
-            alert(`Withdrawal request of ₱${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} submitted successfully! It will be processed within 1-3 business days.`);
+            alert(`Withdrawal request of ₱${amountValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} submitted successfully! It will be processed within 1-3 business days.`);
         } catch (error) {
             console.error("Error withdrawing from wallet:", error);
             alert(`Error: ${error.message || "Failed to withdraw from wallet"}`);
         } finally {
             setProcessing(false);
         }
-    };
+    }, [userId, currentUserId]);
 
     const formatDate = (timestamp) => {
         if (!timestamp) return "N/A";
@@ -648,13 +630,9 @@ const EWallet = ({ userId = null }) => {
                 {/* Withdraw Modal */}
                 <WithdrawModal
                     showWithdrawModal={showWithdrawModal}
-                    withdrawAmount={withdrawAmount}
-                    withdrawEmail={withdrawEmail}
                     balance={balance}
                     processing={processing}
                     onClose={handleWithdrawClose}
-                    onAmountChange={handleWithdrawAmountChange}
-                    onEmailChange={handleWithdrawEmailChange}
                     onSubmit={handleWithdraw}
                 />
             </div>
