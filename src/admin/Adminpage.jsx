@@ -19,7 +19,7 @@ import {
     FaEye,
     FaEdit
 } from "react-icons/fa";
-import { auth, getUserData, getUserType, getAllBookings, getAllReviews, getAllListings, getAllUsers, getAllTransactions, getListing, getWalletBalance, saveRulesAndRegulations, getRulesAndRegulations, saveCancellationRules, getCancellationRules } from "../../Config";
+import { auth, getUserData, getUserType, getAllBookings, getAllReviews, getAllListings, getAllUsers, getAllTransactions, getListing, getWalletBalance, saveRulesAndRegulations, getRulesAndRegulations, saveCancellationRules, getCancellationRules, approveWithdrawal, rejectWithdrawal } from "../../Config";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import UserDetails from "../components/UserDetails";
 import EWallet from "../components/EWallet";
@@ -910,17 +910,44 @@ const Adminpage = () => {
                                                                 >
                                                                     <FaEye />
                                                                 </button>
-                                                                {transaction.status === "pending" && (
+                                                                {transaction.status === "pending" && transaction.type === "withdrawal" && (
                                                                     <>
                                                                         <button
+                                                                            onClick={async () => {
+                                                                                if (window.confirm(`Approve withdrawal of ₱${(transaction.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}?`)) {
+                                                                                    try {
+                                                                                        await approveWithdrawal(transaction.id);
+                                                                                        alert("Withdrawal approved successfully!");
+                                                                                        // Reload transactions
+                                                                                        const transactionsData = await getAllTransactions();
+                                                                                        setTransactions(transactionsData);
+                                                                                    } catch (error) {
+                                                                                        alert(`Error: ${error.message || "Failed to approve withdrawal"}`);
+                                                                                    }
+                                                                                }
+                                                                            }}
                                                                             className="p-2 text-green-600 hover:bg-green-50 rounded transition"
-                                                                            title="Confirm"
+                                                                            title="Approve Withdrawal"
                                                                         >
                                                                             <FaCheckCircle />
                                                                         </button>
                                                                         <button
+                                                                            onClick={async () => {
+                                                                                const reason = window.prompt("Enter rejection reason (optional):");
+                                                                                if (reason !== null) { // User didn't cancel
+                                                                                    try {
+                                                                                        await rejectWithdrawal(transaction.id, reason || "");
+                                                                                        alert("Withdrawal rejected successfully!");
+                                                                                        // Reload transactions
+                                                                                        const transactionsData = await getAllTransactions();
+                                                                                        setTransactions(transactionsData);
+                                                                                    } catch (error) {
+                                                                                        alert(`Error: ${error.message || "Failed to reject withdrawal"}`);
+                                                                                    }
+                                                                                }
+                                                                            }}
                                                                             className="p-2 text-red-600 hover:bg-red-50 rounded transition"
-                                                                            title="Reject"
+                                                                            title="Reject Withdrawal"
                                                                         >
                                                                             <FaTimesCircle />
                                                                         </button>

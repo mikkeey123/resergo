@@ -1525,30 +1525,140 @@ export const withdrawFromWallet = async (userId, amount, paymentMethod = "paypal
             throw new Error("Insufficient balance");
         }
         
-        const newBalance = currentBalance - amount;
-        
-        // Update wallet balance
-        await setDoc(walletRef, {
-            balance: newBalance,
-            updatedAt: serverTimestamp()
-        }, { merge: true });
-        
-        // Create transaction record
+        // DON'T deduct money yet - wait for admin approval
+        // Just create a pending transaction record
         const transactionRef = collection(db, "transactions");
-        await addDoc(transactionRef, {
+        const transactionDoc = await addDoc(transactionRef, {
             userId,
             type: "withdrawal",
             amount,
             paymentMethod,
             accountDetails,
-            status: "completed", // Money is deducted immediately, so status is completed
+            status: "pending", // Pending until admin approves
             createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        });
+        
+        // Return current balance (unchanged) and transaction ID
+        return { success: true, newBalance: currentBalance, transactionId: transactionDoc.id };
+    } catch (error) {
+        console.error("Error creating withdrawal request:", error);
+        throw error;
+    }
+};
+
+// Approve withdrawal - deduct money and update status
+export const approveWithdrawal = async (transactionId) => {
+    try {
+        if (!auth.currentUser) {
+            throw new Error("Unauthorized: User must be authenticated");
+        }
+        
+        // Check if user is admin
+        const userType = await getUserType(auth.currentUser.uid);
+        if (userType !== "admin") {
+            throw new Error("Unauthorized: Only admins can approve withdrawals");
+        }
+        
+        const transactionRef = doc(db, "transactions", transactionId);
+        const transactionDoc = await getDoc(transactionRef);
+        
+        if (!transactionDoc.exists()) {
+            throw new Error("Transaction not found");
+        }
+        
+        const transaction = transactionDoc.data();
+        
+        // Check if already processed
+        if (transaction.status !== "pending") {
+            throw new Error(`Transaction is already ${transaction.status}`);
+        }
+        
+        // Check if it's a withdrawal
+        if (transaction.type !== "withdrawal") {
+            throw new Error("Can only approve withdrawal transactions");
+        }
+        
+        const userId = transaction.userId;
+        const amount = transaction.amount;
+        
+        // Check current balance
+        const walletRef = doc(db, "wallets", userId);
+        const walletDoc = await getDoc(walletRef);
+        const currentBalance = walletDoc.exists() ? (walletDoc.data().balance || 0) : 0;
+        
+        if (currentBalance < amount) {
+            // Update transaction status to rejected due to insufficient balance
+            await updateDoc(transactionRef, {
+                status: "rejected",
+                rejectionReason: "Insufficient balance at time of approval",
+                updatedAt: serverTimestamp()
+            });
+            throw new Error("Insufficient balance - withdrawal rejected");
+        }
+        
+        const newBalance = currentBalance - amount;
+        
+        // Deduct money from wallet
+        await setDoc(walletRef, {
+            balance: newBalance,
+            updatedAt: serverTimestamp()
+        }, { merge: true });
+        
+        // Update transaction status to completed
+        await updateDoc(transactionRef, {
+            status: "completed",
+            approvedBy: auth.currentUser.uid,
+            approvedAt: serverTimestamp(),
             updatedAt: serverTimestamp()
         });
         
         return { success: true, newBalance };
     } catch (error) {
-        console.error("Error withdrawing from wallet:", error);
+        console.error("Error approving withdrawal:", error);
+        throw error;
+    }
+};
+
+// Reject withdrawal - just update status, don't deduct money
+export const rejectWithdrawal = async (transactionId, reason = "") => {
+    try {
+        if (!auth.currentUser) {
+            throw new Error("Unauthorized: User must be authenticated");
+        }
+        
+        // Check if user is admin
+        const userType = await getUserType(auth.currentUser.uid);
+        if (userType !== "admin") {
+            throw new Error("Unauthorized: Only admins can reject withdrawals");
+        }
+        
+        const transactionRef = doc(db, "transactions", transactionId);
+        const transactionDoc = await getDoc(transactionRef);
+        
+        if (!transactionDoc.exists()) {
+            throw new Error("Transaction not found");
+        }
+        
+        const transaction = transactionDoc.data();
+        
+        // Check if already processed
+        if (transaction.status !== "pending") {
+            throw new Error(`Transaction is already ${transaction.status}`);
+        }
+        
+        // Update transaction status to rejected
+        await updateDoc(transactionRef, {
+            status: "rejected",
+            rejectionReason: reason || "Withdrawal rejected by admin",
+            rejectedBy: auth.currentUser.uid,
+            rejectedAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+        });
+        
+        return { success: true };
+    } catch (error) {
+        console.error("Error rejecting withdrawal:", error);
         throw error;
     }
 };

@@ -95,7 +95,7 @@ const WithdrawModal = React.memo(({
                     </div>
                     <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
                         <p className="text-sm text-yellow-800">
-                            <strong>Processing Time:</strong> Withdrawals are typically processed within 1-3 business days.
+                            <strong>Note:</strong> Withdrawal requests require admin approval. Your money will remain in your wallet until the request is approved. You will be notified once it's processed.
                         </p>
                     </div>
                     <div className="flex gap-4 pt-4 border-t border-gray-200">
@@ -372,7 +372,7 @@ const EWallet = ({ userId = null }) => {
             // Reload transaction history
             const history = await getTransactionHistory(targetUserId);
             setTransactions(history);
-            alert(`Withdrawal request of ₱${amountValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} submitted successfully! It will be processed within 1-3 business days.`);
+            alert(`Withdrawal request of ₱${amountValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} submitted successfully! Your request is pending admin approval. The money will remain in your wallet until approved.`);
         } catch (error) {
             console.error("Error withdrawing from wallet:", error);
             alert(`Error: ${error.message || "Failed to withdraw from wallet"}`);
