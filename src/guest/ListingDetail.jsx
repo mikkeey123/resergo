@@ -65,6 +65,9 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
   // Experience/Service booking fields
   const [bookingDate, setBookingDate] = useState("");
   const [bookingTime, setBookingTime] = useState("");
+  const [bookingHour, setBookingHour] = useState("12");
+  const [bookingMinute, setBookingMinute] = useState("00");
+  const [bookingAmPm, setBookingAmPm] = useState("AM");
   const [experienceGroupSize, setExperienceGroupSize] = useState(1);
   const [showAllPhotos, setShowAllPhotos] = useState(false);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
@@ -735,7 +738,7 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
         setBookingError(`Please select a ${category === "Experience" ? "date" : "service date"}`);
         return;
       }
-      if (!bookingTime) {
+      if (!bookingHour || !bookingMinute || !bookingAmPm) {
         setBookingError("Please select a time");
         return;
       }
@@ -758,7 +761,9 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
         bookingData.guests = guests;
       } else if (category === "Experience" || category === "Service") {
         bookingData.bookingDate = bookingDate;
-        bookingData.bookingTime = bookingTime;
+        // Format time as 12-hour format string (e.g., "12:00 AM")
+        const formattedTime = `${bookingHour}:${bookingMinute} ${bookingAmPm}`;
+        bookingData.bookingTime = formattedTime;
         if (category === "Experience") {
           bookingData.groupSize = experienceGroupSize;
         }
@@ -774,6 +779,9 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
       setGuests(1);
       setBookingDate("");
       setBookingTime("");
+      setBookingHour("12");
+      setBookingMinute("00");
+      setBookingAmPm("AM");
       setExperienceGroupSize(1);
       setCouponCode("");
       setAppliedCoupon(null);
@@ -1771,17 +1779,47 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
                       />
                     </div>
 
-                    {/* Booking Time */}
+                    {/* Booking Time - 12 Hour Format */}
                     <div>
                       <label className="block text-xs font-semibold text-gray-700 mb-2 uppercase">
                         TIME
                       </label>
-                      <input
-                        type="time"
-                        value={bookingTime}
-                        onChange={(e) => setBookingTime(e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
-                      />
+                      <div className="flex gap-2 items-center">
+                        {/* Hour Select */}
+                        <select
+                          value={bookingHour}
+                          onChange={(e) => setBookingHour(e.target.value)}
+                          className="flex-1 px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        >
+                          {Array.from({ length: 12 }, (_, i) => i + 1).map((hour) => (
+                            <option key={hour} value={hour.toString()}>
+                              {hour}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-gray-600 font-semibold">:</span>
+                        {/* Minute Select */}
+                        <select
+                          value={bookingMinute}
+                          onChange={(e) => setBookingMinute(e.target.value)}
+                          className="flex-1 px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        >
+                          {Array.from({ length: 60 }, (_, i) => i).map((min) => (
+                            <option key={min} value={min.toString().padStart(2, '0')}>
+                              {min.toString().padStart(2, '0')}
+                            </option>
+                          ))}
+                        </select>
+                        {/* AM/PM Select */}
+                        <select
+                          value={bookingAmPm}
+                          onChange={(e) => setBookingAmPm(e.target.value)}
+                          className="flex-1 px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900"
+                        >
+                          <option value="AM">AM</option>
+                          <option value="PM">PM</option>
+                        </select>
+                      </div>
                     </div>
 
                     {/* Group Size (Experience only) */}
@@ -1842,7 +1880,7 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
                     if (category === "Home") {
                       return bookingLoading || !checkIn || !checkOut;
                     } else if (category === "Experience" || category === "Service") {
-                      return bookingLoading || !bookingDate || !bookingTime || (category === "Experience" && experienceGroupSize < 1);
+                      return bookingLoading || !bookingDate || !bookingHour || !bookingMinute || !bookingAmPm || (category === "Experience" && experienceGroupSize < 1);
                     }
                     return bookingLoading;
                   })()}

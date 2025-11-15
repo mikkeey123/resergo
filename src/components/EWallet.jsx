@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { FaWallet, FaPaypal, FaArrowUp, FaArrowDown, FaHistory, FaTimes, FaCheckCircle } from "react-icons/fa";
 import { auth, getWalletBalance, topUpWallet, withdrawFromWallet, getTransactionHistory } from "../../Config";
 import { onAuthStateChanged } from "firebase/auth";
@@ -17,33 +17,7 @@ const WithdrawModal = React.memo(({
     onEmailChange, 
     onSubmit 
 }) => {
-    const emailInputRef = useRef(null);
-    const amountInputRef = useRef(null);
-    const hasFocusedOnMount = useRef(false);
-
-    // Focus amount input ONLY when modal first opens - never refocus after that
-    useEffect(() => {
-        if (showWithdrawModal && !hasFocusedOnMount.current) {
-            // Only focus once when modal opens
-            const timer = setTimeout(() => {
-                // Double-check we haven't focused yet and modal is still open
-                if (amountInputRef.current && showWithdrawModal && !hasFocusedOnMount.current) {
-                    // Only focus if email input is NOT currently focused
-                    if (document.activeElement !== emailInputRef.current) {
-                        amountInputRef.current.focus();
-                        hasFocusedOnMount.current = true;
-                    }
-                }
-            }, 100);
-            
-            return () => clearTimeout(timer);
-        } else if (!showWithdrawModal) {
-            // Reset everything when modal closes
-            hasFocusedOnMount.current = false;
-        }
-    }, [showWithdrawModal]); // Only depend on showWithdrawModal - NEVER refocus on email changes
-
-    // Handle email input change - simple handler like amount input
+    // Handle email input change - simple handler
     const handleEmailChange = useCallback((e) => {
         onEmailChange(e);
     }, [onEmailChange]);
@@ -80,7 +54,6 @@ const WithdrawModal = React.memo(({
                             Amount (₱)
                         </label>
                         <input
-                            ref={amountInputRef}
                             type="number"
                             value={withdrawAmount}
                             onChange={onAmountChange}
@@ -101,7 +74,6 @@ const WithdrawModal = React.memo(({
                             PayPal Email Address *
                         </label>
                         <input
-                            ref={emailInputRef}
                             type="email"
                             value={withdrawEmail}
                             onChange={handleEmailChange}
