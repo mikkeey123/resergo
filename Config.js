@@ -1541,7 +1541,7 @@ export const withdrawFromWallet = async (userId, amount, paymentMethod = "paypal
             amount,
             paymentMethod,
             accountDetails,
-            status: "pending", // Withdrawals are pending until processed
+            status: "completed", // Money is deducted immediately, so status is completed
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
         });
