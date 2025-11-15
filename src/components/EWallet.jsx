@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { FaWallet, FaPaypal, FaArrowUp, FaArrowDown, FaHistory, FaTimes, FaCheckCircle } from "react-icons/fa";
 import { auth, getWalletBalance, topUpWallet, withdrawFromWallet, getTransactionHistory } from "../../Config";
 import { onAuthStateChanged } from "firebase/auth";
@@ -17,7 +17,19 @@ const WithdrawModal = React.memo(({
     onEmailChange, 
     onSubmit 
 }) => {
-    // Handle email input change - simple handler
+    const emailInputRef = useRef(null);
+
+    // Sync ref value with prop value only when modal first opens
+    useEffect(() => {
+        if (showWithdrawModal && emailInputRef.current) {
+            // Only set if different to avoid unnecessary updates
+            if (emailInputRef.current.value !== (withdrawEmail || "")) {
+                emailInputRef.current.value = withdrawEmail || "";
+            }
+        }
+    }, [showWithdrawModal]); // Only depend on showWithdrawModal
+
+    // Handle email input change - update parent state
     const handleEmailChange = useCallback((e) => {
         onEmailChange(e);
     }, [onEmailChange]);
@@ -74,8 +86,9 @@ const WithdrawModal = React.memo(({
                             PayPal Email Address *
                         </label>
                         <input
+                            ref={emailInputRef}
                             type="email"
-                            value={withdrawEmail}
+                            defaultValue={withdrawEmail || ""}
                             onChange={handleEmailChange}
                             className="w-full px-4 py-3 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 transition"
                             placeholder="your.email@example.com"
@@ -109,6 +122,20 @@ const WithdrawModal = React.memo(({
                 </form>
             </div>
         </div>
+    );
+}, (prevProps, nextProps) => {
+    // Custom comparison: only re-render if props that affect rendering change
+    // Don't re-render just because withdrawEmail changed (it's uncontrolled)
+    return (
+        prevProps.showWithdrawModal === nextProps.showWithdrawModal &&
+        prevProps.withdrawAmount === nextProps.withdrawAmount &&
+        prevProps.balance === nextProps.balance &&
+        prevProps.processing === nextProps.processing &&
+        prevProps.onClose === nextProps.onClose &&
+        prevProps.onAmountChange === nextProps.onAmountChange &&
+        prevProps.onEmailChange === nextProps.onEmailChange &&
+        prevProps.onSubmit === nextProps.onSubmit
+        // Intentionally NOT comparing withdrawEmail to prevent re-renders
     );
 });
 
@@ -329,7 +356,7 @@ const EWallet = ({ userId = null }) => {
         setShowWithdrawModal(false);
     }, []);
 
-    // Handle withdrawal
+    // Handle withdrawal - need to get email from ref since it's uncontrolled
     const handleWithdraw = async (e) => {
         e.preventDefault();
         if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) {
@@ -337,7 +364,7 @@ const EWallet = ({ userId = null }) => {
             return;
         }
 
-        // Get email from state (controlled input)
+        // Get email from state (it's updated via onChange)
         const emailValue = withdrawEmail;
         if (!emailValue || !emailValue.includes("@")) {
             alert("Please enter a valid PayPal email address");
