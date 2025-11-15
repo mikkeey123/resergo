@@ -17,9 +17,12 @@ import {
     FaCheckCircle,
     FaTimesCircle,
     FaEye,
-    FaEdit
+    FaEdit,
+    FaCog,
+    FaFilter,
+    FaSave
 } from "react-icons/fa";
-import { auth, getUserData, getUserType, getAllBookings, getAllReviews, getAllListings, getAllUsers, getAllTransactions, getListing, getWalletBalance, saveRulesAndRegulations, getRulesAndRegulations, saveCancellationRules, getCancellationRules, approveWithdrawal, rejectWithdrawal } from "../../Config";
+import { auth, getUserData, getUserType, getAllBookings, getAllReviews, getAllListings, getAllUsers, getAllTransactions, getListing, getWalletBalance, saveRulesAndRegulations, getRulesAndRegulations, saveCancellationRules, getCancellationRules, approveWithdrawal, rejectWithdrawal, savePlatformFeePercentage, getPlatformFeePercentage, getFeeTransactions, getFeeStatistics } from "../../Config";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import UserDetails from "../components/UserDetails";
 import EWallet from "../components/EWallet";
@@ -51,6 +54,19 @@ const Adminpage = () => {
         noRefundDays: 1
     });
     const [regulations, setRegulations] = useState("");
+    
+    // Platform Fee states
+    const [platformFeePercentage, setPlatformFeePercentage] = useState(7.5);
+    const [hostSharePercentage, setHostSharePercentage] = useState(92.5);
+    const [editingFee, setEditingFee] = useState(false);
+    const [feeTransactions, setFeeTransactions] = useState([]);
+    const [feeStatistics, setFeeStatistics] = useState({
+        totalFees: 0,
+        thisMonthFees: 0,
+        lastMonthFees: 0,
+        pendingTransfers: 0
+    });
+    const [loadingFees, setLoadingFees] = useState(false);
 
     // Function to fetch and update user data
     const fetchUserData = async (user) => {
@@ -152,7 +168,31 @@ const Adminpage = () => {
         if (activeTab === "policies") {
             fetchPolicyData();
         }
+        if (activeTab === "serviceFees") {
+            fetchServiceFeesData();
+        }
     }, [activeTab]);
+    
+    // Fetch service fees data
+    const fetchServiceFeesData = async () => {
+        try {
+            setLoadingFees(true);
+            const [feeConfig, transactions, statistics] = await Promise.all([
+                getPlatformFeePercentage(),
+                getFeeTransactions(),
+                getFeeStatistics()
+            ]);
+            
+            setPlatformFeePercentage(feeConfig.percentage);
+            setHostSharePercentage(feeConfig.hostShare);
+            setFeeTransactions(transactions);
+            setFeeStatistics(statistics);
+        } catch (error) {
+            console.error("Error fetching service fees data:", error);
+        } finally {
+            setLoadingFees(false);
+        }
+    };
 
     // Fetch policy data (rules & regulations, cancellation rules)
     const fetchPolicyData = async () => {
@@ -328,6 +368,7 @@ const Adminpage = () => {
         { id: "policies", label: "Policy & Compliance", icon: <FaShieldAlt /> },
         { id: "reports", label: "Reports", icon: <FaFileAlt /> },
         { id: "payments", label: "Payments", icon: <FaDollarSign /> },
+        { id: "serviceFees", label: "Service Fees", icon: <FaCog /> },
         { id: "settings", label: "Account", icon: <FaUser /> },
     ];
 
@@ -488,6 +529,7 @@ const Adminpage = () => {
                              activeTab === "policies" ? "Policy & Compliance" :
                              activeTab === "reports" ? "Reports" :
                              activeTab === "payments" ? "Payments" :
+                             activeTab === "serviceFees" ? "Service Fees" :
                              activeTab === "settings" ? "Account" : "Admin Dashboard"}
                         </h1>
                     </div>
@@ -519,7 +561,7 @@ const Adminpage = () => {
 
                 {/* Content Area */}
                 <div className="flex-1 overflow-y-auto p-4 md:p-6">
-                    {loading && activeTab !== "settings" && (
+                    {loading && activeTab !== "settings" && activeTab !== "serviceFees" && (
                         <div className="flex items-center justify-center h-64">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
                         </div>
@@ -954,6 +996,274 @@ const Adminpage = () => {
                                                                     </>
                                                                 )}
                                                             </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Service Fees Tab */}
+                    {activeTab === "serviceFees" && (
+                        <div className="space-y-6">
+                            {/* Platform Fee Configuration */}
+                            <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <FaCog className="text-purple-600 text-2xl" />
+                                        <div>
+                                            <h2 className="text-xl font-semibold text-gray-900">Platform Fee Configuration</h2>
+                                            <p className="text-sm text-gray-600">Set the percentage of booking revenue that goes to the platform</p>
+                                        </div>
+                                    </div>
+                                    {!editingFee && (
+                                        <button
+                                            onClick={() => setEditingFee(true)}
+                                            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+                                        >
+                                            <FaEdit />
+                                            <span>Edit Percentage</span>
+                                        </button>
+                                    )}
+                                </div>
+
+                                {editingFee ? (
+                                    <div className="space-y-4">
+                                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-start gap-3">
+                                            <span className="text-yellow-600 text-xl">⚠️</span>
+                                            <div className="text-sm text-yellow-800">
+                                                <strong>Changing Platform Fee Percentage.</strong> This change will apply to all new bookings going forward. Existing transactions will not be affected. Make sure to notify hosts about fee changes.
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Platform Fee Percentage
+                                                </label>
+                                                <div className="flex items-center gap-2">
+                                                    <input
+                                                        type="number"
+                                                        value={platformFeePercentage}
+                                                        onChange={(e) => {
+                                                            const value = parseFloat(e.target.value) || 0;
+                                                            setPlatformFeePercentage(value);
+                                                            setHostSharePercentage(100 - value);
+                                                        }}
+                                                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                                        min="0"
+                                                        max="100"
+                                                        step="0.1"
+                                                    />
+                                                    <span className="text-gray-700 font-medium">%</span>
+                                                </div>
+                                                <p className="text-xs text-gray-500 mt-1">Enter a value between 0% and 100%</p>
+                                            </div>
+                                            
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Host Share Percentage
+                                                </label>
+                                                <div className="px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg">
+                                                    <span className="text-gray-900 font-semibold">{hostSharePercentage.toFixed(1)}%</span>
+                                                </div>
+                                                <p className="text-xs text-gray-500 mt-1">(Automatically calculated)</p>
+                                                <p className="text-xs text-gray-600 mt-1">Hosts will receive {hostSharePercentage.toFixed(1)}% of each booking</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Example Calculation */}
+                                        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                            <p className="text-sm font-semibold text-gray-700 mb-3">Example Calculation</p>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <p className="text-xs text-gray-600 mb-1">For a ₱10,000 booking:</p>
+                                                    <p className="text-purple-600 font-semibold">
+                                                        Platform Fee: ₱{((10000 * platformFeePercentage) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-gray-600 mb-1">&nbsp;</p>
+                                                    <p className="text-green-600 font-semibold">
+                                                        Host Earnings: ₱{((10000 * hostSharePercentage) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex gap-3">
+                                            <button
+                                                onClick={async () => {
+                                                    try {
+                                                        await savePlatformFeePercentage(platformFeePercentage);
+                                                        alert("Platform fee percentage saved successfully!");
+                                                        setEditingFee(false);
+                                                        await fetchServiceFeesData();
+                                                    } catch (error) {
+                                                        alert(`Error: ${error.message || "Failed to save platform fee"}`);
+                                                    }
+                                                }}
+                                                className="flex items-center gap-2 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+                                            >
+                                                <FaSave />
+                                                <span>Save Changes</span>
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    const feeConfig = await getPlatformFeePercentage();
+                                                    setPlatformFeePercentage(feeConfig.percentage);
+                                                    setHostSharePercentage(feeConfig.hostShare);
+                                                    setEditingFee(false);
+                                                }}
+                                                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                                        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white">
+                                            <div className="flex items-center gap-3 mb-4">
+                                                <div className="p-3 bg-white/20 rounded-lg">
+                                                    <span className="text-2xl">%</span>
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-semibold text-lg">Platform Fee</h3>
+                                                    <p className="text-purple-100 text-sm">This percentage is deducted from each booking as the platform service fee.</p>
+                                                </div>
+                                            </div>
+                                            <p className="text-4xl font-bold">{platformFeePercentage}%</p>
+                                        </div>
+                                        
+                                        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white">
+                                            <div className="flex items-center gap-3 mb-4">
+                                                <div className="p-3 bg-white/20 rounded-lg">
+                                                    <FaDollarSign className="text-2xl" />
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-semibold text-lg">Host Share</h3>
+                                                    <p className="text-green-100 text-sm">Hosts receive this percentage of each booking as their earnings.</p>
+                                                </div>
+                                            </div>
+                                            <p className="text-4xl font-bold">{hostSharePercentage}%</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Summary Cards */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="p-2 bg-blue-100 rounded-lg">
+                                            <FaDollarSign className="text-blue-600 text-xl" />
+                                        </div>
+                                        <h3 className="text-sm font-medium text-gray-700">Total Fees</h3>
+                                    </div>
+                                    <p className="text-2xl font-bold text-gray-900">
+                                        ₱{feeStatistics.totalFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </p>
+                                </div>
+                                
+                                <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="p-2 bg-green-100 rounded-lg">
+                                            <FaChartLine className="text-green-600 text-xl" />
+                                        </div>
+                                        <h3 className="text-sm font-medium text-gray-700">This Month</h3>
+                                    </div>
+                                    <p className="text-2xl font-bold text-gray-900">
+                                        ₱{feeStatistics.thisMonthFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </p>
+                                </div>
+                                
+                                <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="p-2 bg-purple-100 rounded-lg">
+                                            <FaDollarSign className="text-purple-600 text-xl" />
+                                        </div>
+                                        <h3 className="text-sm font-medium text-gray-700">Last Month</h3>
+                                    </div>
+                                    <p className="text-2xl font-bold text-gray-900">
+                                        ₱{feeStatistics.lastMonthFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </p>
+                                </div>
+                                
+                                <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="p-2 bg-orange-100 rounded-lg">
+                                            <FaDollarSign className="text-orange-600 text-xl" />
+                                        </div>
+                                        <h3 className="text-sm font-medium text-gray-700">Pending Transfer</h3>
+                                    </div>
+                                    <p className="text-2xl font-bold text-gray-900">
+                                        ₱{feeStatistics.pendingTransfers.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Fee Transactions Table */}
+                            <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                                <div className="flex items-center justify-between mb-6">
+                                    <h2 className="text-xl font-semibold text-gray-900">Fee Transactions</h2>
+                                    <button className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition">
+                                        <FaFilter />
+                                        <span>Filter</span>
+                                    </button>
+                                </div>
+                                
+                                {loadingFees ? (
+                                    <div className="text-center py-12">
+                                        <p className="text-gray-600">Loading fee transactions...</p>
+                                    </div>
+                                ) : feeTransactions.length === 0 ? (
+                                    <div className="text-center py-12">
+                                        <p className="text-gray-500">No fee transactions found.</p>
+                                    </div>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full">
+                                            <thead>
+                                                <tr className="border-b border-gray-200">
+                                                    <th className="text-left py-3 px-4 text-gray-700 font-semibold">Transaction ID</th>
+                                                    <th className="text-left py-3 px-4 text-gray-700 font-semibold">Booking Amount</th>
+                                                    <th className="text-left py-3 px-4 text-gray-700 font-semibold">Platform Fee ({platformFeePercentage}%)</th>
+                                                    <th className="text-left py-3 px-4 text-gray-700 font-semibold">Host Earnings ({hostSharePercentage}%)</th>
+                                                    <th className="text-left py-3 px-4 text-gray-700 font-semibold">Date</th>
+                                                    <th className="text-left py-3 px-4 text-gray-700 font-semibold">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {feeTransactions.map((transaction) => (
+                                                    <tr key={transaction.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                                        <td className="py-3 px-4 text-gray-900 font-mono text-sm">
+                                                            {transaction.transactionId?.substring(0, 12)}...
+                                                        </td>
+                                                        <td className="py-3 px-4 text-gray-900 font-semibold">
+                                                            ₱{transaction.bookingAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        </td>
+                                                        <td className="py-3 px-4 text-purple-600 font-semibold">
+                                                            ₱{transaction.platformFee.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({transaction.platformFeePercent}%)
+                                                        </td>
+                                                        <td className="py-3 px-4 text-green-600 font-semibold">
+                                                            ₱{transaction.hostEarnings.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                        </td>
+                                                        <td className="py-3 px-4 text-gray-700">
+                                                            {transaction.date?.toDate().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }) || "N/A"}
+                                                        </td>
+                                                        <td className="py-3 px-4">
+                                                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                                                transaction.status === "Transferred"
+                                                                    ? "bg-green-100 text-green-700 border border-green-300"
+                                                                    : "bg-yellow-100 text-yellow-700 border border-yellow-300"
+                                                            }`}>
+                                                                {transaction.status}
+                                                            </span>
                                                         </td>
                                                     </tr>
                                                 ))}

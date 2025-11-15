@@ -2629,4 +2629,165 @@ export const getCancellationRules = async () => {
     }
 };
 
-export { auth, db, googleProvider, handleGoogleSignup, checkUserExists, checkAccountComplete, saveGoogleUserData, saveAdminUserData, saveHostUserData, getUserData, getUserType, updatePasswordInFirestore, verifyPassword, updateProfilePicture, updateUserProfile, updateUserType, linkEmailPasswordToGoogleAccount, saveListing, updateListing, getListing, deleteListing, getHostListings, getPublishedListings, saveReview, getListingReviews, updateListingRating, updateReview };
+// Save Platform Fee Percentage (Admin only)
+export const savePlatformFeePercentage = async (percentage) => {
+    try {
+        if (!auth.currentUser) {
+            throw new Error("User must be authenticated");
+        }
+        
+        const userType = await getUserType(auth.currentUser.uid);
+        if (userType !== "admin") {
+            throw new Error("Unauthorized: Only admins can update platform fee");
+        }
+        
+        if (percentage < 0 || percentage > 100) {
+            throw new Error("Platform fee percentage must be between 0 and 100");
+        }
+        
+        const feeRef = doc(db, "platformSettings", "platformFee");
+        await setDoc(feeRef, {
+            percentage: parseFloat(percentage),
+            hostShare: 100 - parseFloat(percentage),
+            updatedAt: serverTimestamp(),
+            updatedBy: auth.currentUser.uid
+        }, { merge: true });
+        
+        console.log("Platform fee percentage saved successfully");
+        return true;
+    } catch (error) {
+        console.error("Error saving platform fee percentage:", error);
+        throw error;
+    }
+};
+
+// Get Platform Fee Percentage
+export const getPlatformFeePercentage = async () => {
+    try {
+        const feeRef = doc(db, "platformSettings", "platformFee");
+        const feeDoc = await getDoc(feeRef);
+        
+        if (feeDoc.exists()) {
+            const data = feeDoc.data();
+            return {
+                percentage: data.percentage || 7.5,
+                hostShare: data.hostShare || 92.5
+            };
+        }
+        // Default platform fee
+        return {
+            percentage: 7.5,
+            hostShare: 92.5
+        };
+    } catch (error) {
+        console.error("Error fetching platform fee percentage:", error);
+        return {
+            percentage: 7.5,
+            hostShare: 92.5
+        };
+    }
+};
+
+// Get Fee Transactions (from bookings)
+export const getFeeTransactions = async () => {
+    try {
+        // Get all completed bookings
+        const bookingsQuery = query(
+            collection(db, "bookings"),
+            where("status", "==", "active")
+        );
+        
+        const bookingsSnapshot = await getDocs(bookingsQuery);
+        const feeTransactions = [];
+        
+        // Get current platform fee percentage
+        const feeConfig = await getPlatformFeePercentage();
+        const platformFeePercent = feeConfig.percentage;
+        
+        bookingsSnapshot.forEach((doc) => {
+            const booking = doc.data();
+            if (booking.totalAmount && booking.totalAmount > 0) {
+                const platformFee = (booking.totalAmount * platformFeePercent) / 100;
+                const hostEarnings = booking.totalAmount - platformFee;
+                
+                feeTransactions.push({
+                    id: doc.id,
+                    transactionId: doc.id,
+                    bookingId: doc.id,
+                    bookingAmount: booking.totalAmount,
+                    platformFee: platformFee,
+                    hostEarnings: hostEarnings,
+                    platformFeePercent: platformFeePercent,
+                    date: booking.createdAt,
+                    status: booking.paymentStatus === "paid" ? "Transferred" : "Pending",
+                    guestId: booking.guestId,
+                    hostId: booking.hostId,
+                    listingTitle: booking.listingTitle || "Unknown"
+                });
+            }
+        });
+        
+        // Sort by date (newest first)
+        feeTransactions.sort((a, b) => {
+            const dateA = a.date?.toMillis() || 0;
+            const dateB = b.date?.toMillis() || 0;
+            return dateB - dateA;
+        });
+        
+        return feeTransactions;
+    } catch (error) {
+        console.error("Error fetching fee transactions:", error);
+        throw error;
+    }
+};
+
+// Get Fee Statistics
+export const getFeeStatistics = async () => {
+    try {
+        const feeTransactions = await getFeeTransactions();
+        
+        const totalFees = feeTransactions.reduce((sum, t) => sum + (t.platformFee || 0), 0);
+        
+        // Calculate this month's fees
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const thisMonthFees = feeTransactions
+            .filter(t => {
+                const transactionDate = t.date?.toDate() || new Date(0);
+                return transactionDate >= startOfMonth;
+            })
+            .reduce((sum, t) => sum + (t.platformFee || 0), 0);
+        
+        // Calculate last month's fees
+        const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+        const lastMonthFees = feeTransactions
+            .filter(t => {
+                const transactionDate = t.date?.toDate() || new Date(0);
+                return transactionDate >= lastMonthStart && transactionDate <= lastMonthEnd;
+            })
+            .reduce((sum, t) => sum + (t.platformFee || 0), 0);
+        
+        // Pending transfers (fees from bookings with pending payment status)
+        const pendingTransfers = feeTransactions
+            .filter(t => t.status === "Pending")
+            .reduce((sum, t) => sum + (t.platformFee || 0), 0);
+        
+        return {
+            totalFees,
+            thisMonthFees,
+            lastMonthFees,
+            pendingTransfers
+        };
+    } catch (error) {
+        console.error("Error calculating fee statistics:", error);
+        return {
+            totalFees: 0,
+            thisMonthFees: 0,
+            lastMonthFees: 0,
+            pendingTransfers: 0
+        };
+    }
+};
+
+export { auth, db, googleProvider, handleGoogleSignup, checkUserExists, checkAccountComplete, saveGoogleUserData, saveAdminUserData, saveHostUserData, getUserData, getUserType, updatePasswordInFirestore, verifyPassword, updateProfilePicture, updateUserProfile, updateUserType, linkEmailPasswordToGoogleAccount, saveListing, updateListing, getListing, deleteListing, getHostListings, getPublishedListings, saveReview, getListingReviews, updateListingRating, updateReview, savePlatformFeePercentage, getPlatformFeePercentage, getFeeTransactions, getFeeStatistics };
