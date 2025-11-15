@@ -9,6 +9,7 @@ const Favorites = ({ onBack }) => {
     const [loading, setLoading] = useState(true);
     const [userId, setUserId] = useState(null);
     const [selectedListing, setSelectedListing] = useState(null);
+    const [selectedCategory, setSelectedCategory] = useState("All");
 
     // Load user favorites
     useEffect(() => {
@@ -85,8 +86,14 @@ const Favorites = ({ onBack }) => {
         description: listing.description || "",
         currency: "₱",
         reviewsCount: listing.reviewsCount || 0,
+        category: listing.category || "Home", // Include category
         fullListing: listing
     }));
+
+    // Filter listings by category
+    const filteredListings = selectedCategory === "All" 
+        ? transformedListings 
+        : transformedListings.filter(listing => listing.category === selectedCategory);
 
     // Reusable listing card component
     const ListingCard = ({ listing, onListingClick, onRemoveFavorite }) => {
@@ -198,9 +205,30 @@ const Favorites = ({ onBack }) => {
                             Back
                         </button>
                     )}
-                    <h2 className="text-3xl font-bold text-gray-900">
-                        Your Favorites
-                    </h2>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                        <h2 className="text-3xl font-bold text-gray-900">
+                            Your Favorites
+                        </h2>
+                        {/* Category Filter */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-medium text-gray-700">Filter by:</span>
+                            <div className="flex gap-2">
+                                {["All", "Home", "Experience", "Service"].map((category) => (
+                                    <button
+                                        key={category}
+                                        onClick={() => setSelectedCategory(category)}
+                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                            selectedCategory === category
+                                                ? "bg-blue-600 text-white"
+                                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                        }`}
+                                    >
+                                        {category}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {loading ? (
@@ -211,23 +239,37 @@ const Favorites = ({ onBack }) => {
                     <div className="text-center py-12">
                         <p className="text-gray-600">Please log in to view your favorites.</p>
                     </div>
-                ) : transformedListings.length === 0 ? (
+                ) : filteredListings.length === 0 ? (
                     <div className="text-center py-12">
                         <FaHeart className="text-6xl text-gray-300 mx-auto mb-4" />
-                        <p className="text-gray-600 text-lg mb-2">No favorites yet</p>
-                        <p className="text-gray-500">Start exploring and add listings to your favorites!</p>
+                        <p className="text-gray-600 text-lg mb-2">
+                            {selectedCategory === "All" 
+                                ? "No favorites yet" 
+                                : `No ${selectedCategory} favorites yet`}
+                        </p>
+                        <p className="text-gray-500">
+                            {selectedCategory === "All"
+                                ? "Start exploring and add listings to your favorites!"
+                                : `Try selecting a different category or add some ${selectedCategory} listings to your favorites!`}
+                        </p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-6">
-                        {transformedListings.map((listing) => (
-                            <ListingCard
-                                key={listing.id}
-                                listing={listing}
-                                onListingClick={handleListingClick}
-                                onRemoveFavorite={handleRemoveFavorite}
-                            />
-                        ))}
-                    </div>
+                    <>
+                        <div className="mb-4 text-sm text-gray-600">
+                            Showing {filteredListings.length} {filteredListings.length === 1 ? 'favorite' : 'favorites'}
+                            {selectedCategory !== "All" && ` in ${selectedCategory}`}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-6">
+                            {filteredListings.map((listing) => (
+                                <ListingCard
+                                    key={listing.id}
+                                    listing={listing}
+                                    onListingClick={handleListingClick}
+                                    onRemoveFavorite={handleRemoveFavorite}
+                                />
+                            ))}
+                        </div>
+                    </>
                 )}
             </div>
         </div>
