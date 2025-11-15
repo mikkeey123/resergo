@@ -167,18 +167,17 @@ const Bookings = ({ onBack }) => {
                 </div>
 
                 {/* Filters */}
-                <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200 mb-6">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Filter Bookings</h2>
-                    <div className="space-y-6">
+                <div className="bg-white rounded-xl shadow-md p-4 border border-gray-200 mb-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
                         {/* Status Filter */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-3">Status</label>
+                        <div className="flex items-center gap-3">
+                            <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Status:</label>
                             <div className="flex gap-2 flex-wrap">
                                 {["All", "Pending", "Approved", "Rejected"].map((status) => (
                                     <button
                                         key={status}
                                         onClick={() => setStatusFilter(status)}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                                             statusFilter === status
                                                 ? "bg-blue-600 text-white shadow-md"
                                                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -188,23 +187,17 @@ const Bookings = ({ onBack }) => {
                                     </button>
                                 ))}
                             </div>
-                            <p className="text-xs text-gray-500 mt-2">
-                                {statusFilter === "Pending" && "Bookings waiting for host approval"}
-                                {statusFilter === "Approved" && "Bookings approved by host"}
-                                {statusFilter === "Rejected" && "Canceled bookings or cancellation requests"}
-                                {statusFilter === "All" && "Show all booking statuses"}
-                            </p>
                         </div>
 
                         {/* Type Filter */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-3">Type</label>
+                        <div className="flex items-center gap-3">
+                            <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Type:</label>
                             <div className="flex gap-2 flex-wrap">
                                 {["All", "Reservation", "Cancellation"].map((type) => (
                                     <button
                                         key={type}
                                         onClick={() => setTypeFilter(type)}
-                                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                                             typeFilter === type
                                                 ? "bg-blue-600 text-white shadow-md"
                                                 : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -214,20 +207,15 @@ const Bookings = ({ onBack }) => {
                                     </button>
                                 ))}
                             </div>
-                            <p className="text-xs text-gray-500 mt-2">
-                                {typeFilter === "Reservation" && "Active bookings (pending or approved)"}
-                                {typeFilter === "Cancellation" && "Canceled bookings or cancellation requests"}
-                                {typeFilter === "All" && "Show all booking types"}
-                            </p>
                         </div>
+
+                        {/* Results Count */}
+                        {filteredBookings.length > 0 && (
+                            <div className="ml-auto text-sm text-gray-600">
+                                <span className="font-medium">{filteredBookings.length} {filteredBookings.length === 1 ? 'booking' : 'bookings'}</span>
+                            </div>
+                        )}
                     </div>
-                    {filteredBookings.length > 0 && (
-                        <div className="mt-4 pt-4 border-t border-gray-200 text-sm text-gray-600">
-                            <span className="font-medium">Showing {filteredBookings.length} {filteredBookings.length === 1 ? 'booking' : 'bookings'}</span>
-                            {statusFilter !== "All" && <span className="ml-2">• Status: <span className="font-semibold">{statusFilter}</span></span>}
-                            {typeFilter !== "All" && <span className="ml-2">• Type: <span className="font-semibold">{typeFilter}</span></span>}
-                        </div>
-                    )}
                 </div>
             {error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
