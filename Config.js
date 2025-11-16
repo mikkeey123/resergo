@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, EmailAuthProvider, linkWithCredential, signOut, signInWithCredential } from "firebase/auth";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, serverTimestamp, Timestamp, query, where, getDocs } from "firebase/firestore";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, serverTimestamp, Timestamp, query, where, getDocs, orderBy } from "firebase/firestore";
 import { sendWelcomeEmail, sendBookingApprovalEmail, sendBookingRejectionEmail } from "./src/utils/emailService.js";
 
 // Your web app's Firebase configuration
@@ -764,6 +764,15 @@ const saveReview = async (listingId, guestId, reviewData) => {
 
         // Update listing rating
         await updateListingRating(listingId);
+
+        // Add points to host for receiving a review (25 points per review)
+        try {
+            await addPoints(listing.hostId, 25, `Review received for ${listing.title}`, "earned");
+            console.log("✅ Points added to host for received review");
+        } catch (pointsError) {
+            console.error("❌ Error adding points for review:", pointsError);
+            // Don't fail the review save if points fail
+        }
 
         console.log('Review saved successfully');
         return { success: true, reviewId: reviewRef.id };
@@ -2152,6 +2161,15 @@ export const updateBookingStatus = async (bookingId, status, hostId) => {
                 throw new Error(`Failed to create guest transaction: ${transactionError.message}`);
             }
 
+            // Add points to host for completed booking (50 points per booking)
+            try {
+                await addPoints(hostId, 50, `Booking completed: ${booking.listingTitle}`, "earned");
+                console.log("✅ Points added to host for completed booking");
+            } catch (pointsError) {
+                console.error("❌ Error adding points for booking:", pointsError);
+                // Don't fail the booking update if points fail
+            }
+
             try {
                 await addDoc(collection(db, "transactions"), {
                     userId: hostId,
@@ -2648,6 +2666,227 @@ export const getPrivacyPolicy = async () => {
     } catch (error) {
         console.error("Error fetching privacy policy:", error);
         return "";
+    }
+};
+
+// Points & Rewards System
+
+// Get host points
+export const getHostPoints = async (hostId) => {
+    try {
+        const pointsRef = doc(db, "hostPoints", hostId);
+        const pointsDoc = await getDoc(pointsRef);
+        
+        if (pointsDoc.exists()) {
+            const data = pointsDoc.data();
+            return {
+                currentPoints: data.currentPoints || 0,
+                totalEarned: data.totalEarned || 0,
+                level: calculateLevel(data.currentPoints || 0)
+            };
+        }
+        return {
+            currentPoints: 0,
+            totalEarned: 0,
+            level: "Bronze"
+        };
+    } catch (error) {
+        console.error("Error fetching host points:", error);
+        return {
+            currentPoints: 0,
+            totalEarned: 0,
+            level: "Bronze"
+        };
+    }
+};
+
+// Calculate level based on points
+const calculateLevel = (points) => {
+    if (points >= 5000) return "Platinum";
+    if (points >= 2000) return "Gold";
+    if (points >= 1000) return "Silver";
+    return "Bronze";
+};
+
+// Get next level points threshold
+export const getNextLevelPoints = (currentPoints) => {
+    if (currentPoints < 1000) return 1000;
+    if (currentPoints < 2000) return 2000;
+    if (currentPoints < 5000) return 5000;
+    return 10000; // Next level after Platinum
+};
+
+// Add points to host
+export const addPoints = async (hostId, points, description, type = "earned") => {
+    try {
+        if (!auth.currentUser) {
+            throw new Error("User must be authenticated");
+        }
+        
+        const pointsRef = doc(db, "hostPoints", hostId);
+        const pointsDoc = await getDoc(pointsRef);
+        
+        let currentPoints = 0;
+        let totalEarned = 0;
+        
+        if (pointsDoc.exists()) {
+            const data = pointsDoc.data();
+            currentPoints = data.currentPoints || 0;
+            totalEarned = data.totalEarned || 0;
+        }
+        
+        const newCurrentPoints = currentPoints + points;
+        const newTotalEarned = type === "earned" ? totalEarned + points : totalEarned;
+        
+        await setDoc(pointsRef, {
+            currentPoints: newCurrentPoints,
+            totalEarned: newTotalEarned,
+            updatedAt: serverTimestamp()
+        }, { merge: true });
+        
+        // Create transaction record
+        const transactionRef = collection(db, "pointsTransactions");
+        await addDoc(transactionRef, {
+            hostId,
+            points: points,
+            description,
+            type,
+            createdAt: serverTimestamp()
+        });
+        
+        return { success: true, newPoints: newCurrentPoints };
+    } catch (error) {
+        console.error("Error adding points:", error);
+        throw error;
+    }
+};
+
+// Deduct points from host (for reward redemption)
+export const deductPoints = async (hostId, points, description) => {
+    try {
+        if (!auth.currentUser) {
+            throw new Error("User must be authenticated");
+        }
+        
+        const pointsRef = doc(db, "hostPoints", hostId);
+        const pointsDoc = await getDoc(pointsRef);
+        
+        if (!pointsDoc.exists()) {
+            throw new Error("Host points not found");
+        }
+        
+        const data = pointsDoc.data();
+        const currentPoints = data.currentPoints || 0;
+        
+        if (currentPoints < points) {
+            throw new Error("Insufficient points");
+        }
+        
+        const newCurrentPoints = currentPoints - points;
+        
+        await setDoc(pointsRef, {
+            currentPoints: newCurrentPoints,
+            updatedAt: serverTimestamp()
+        }, { merge: true });
+        
+        // Create transaction record
+        const transactionRef = collection(db, "pointsTransactions");
+        await addDoc(transactionRef, {
+            hostId,
+            points: -points,
+            description,
+            type: "redeemed",
+            createdAt: serverTimestamp()
+        });
+        
+        return { success: true, newPoints: newCurrentPoints };
+    } catch (error) {
+        console.error("Error deducting points:", error);
+        throw error;
+    }
+};
+
+// Get points transactions
+export const getPointsTransactions = async (hostId, limit = 50) => {
+    try {
+        const transactionsQuery = query(
+            collection(db, "pointsTransactions"),
+            where("hostId", "==", hostId),
+            orderBy("createdAt", "desc")
+        );
+        
+        const querySnapshot = await getDocs(transactionsQuery);
+        const transactions = [];
+        
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            transactions.push({
+                id: doc.id,
+                points: data.points,
+                description: data.description,
+                type: data.type,
+                date: data.createdAt?.toDate() || new Date()
+            });
+        });
+        
+        return transactions.slice(0, limit);
+    } catch (error) {
+        console.error("Error fetching points transactions:", error);
+        return [];
+    }
+};
+
+// Redeem reward
+export const redeemReward = async (hostId, rewardId, rewardPoints, rewardTitle) => {
+    try {
+        if (!auth.currentUser || auth.currentUser.uid !== hostId) {
+            throw new Error("Unauthorized");
+        }
+        
+        // Deduct points
+        await deductPoints(hostId, rewardPoints, `Redeemed: ${rewardTitle}`);
+        
+        // Apply reward based on type
+        if (rewardId === "featured_listing") {
+            // Mark listing as featured (you'll need to implement this based on your listing structure)
+            // For now, we'll just track the redemption
+            const rewardRef = collection(db, "hostRewards");
+            await addDoc(rewardRef, {
+                hostId,
+                rewardId,
+                rewardTitle,
+                pointsUsed: rewardPoints,
+                status: "active",
+                expiresAt: Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)), // 7 days
+                createdAt: serverTimestamp()
+            });
+        } else if (rewardId === "premium_badge") {
+            const rewardRef = collection(db, "hostRewards");
+            await addDoc(rewardRef, {
+                hostId,
+                rewardId,
+                rewardTitle,
+                pointsUsed: rewardPoints,
+                status: "active",
+                createdAt: serverTimestamp()
+            });
+        } else if (rewardId === "marketing_boost") {
+            const rewardRef = collection(db, "hostRewards");
+            await addDoc(rewardRef, {
+                hostId,
+                rewardId,
+                rewardTitle,
+                pointsUsed: rewardPoints,
+                status: "active",
+                expiresAt: Timestamp.fromDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)), // 30 days
+                createdAt: serverTimestamp()
+            });
+        }
+        
+        return { success: true };
+    } catch (error) {
+        console.error("Error redeeming reward:", error);
+        throw error;
     }
 };
 

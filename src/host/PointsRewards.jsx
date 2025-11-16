@@ -1,31 +1,37 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { FaStar, FaGift, FaTrophy, FaCoins } from "react-icons/fa";
+import { auth, getHostPoints, getNextLevelPoints, getPointsTransactions, redeemReward } from "../../Config";
+import { onAuthStateChanged } from "firebase/auth";
 
 const PointsRewards = () => {
-    // Sample data
-    const currentPoints = 1250;
-    const totalEarned = 5000;
-    const level = "Gold";
-    const nextLevelPoints = 2000;
+    const [currentPoints, setCurrentPoints] = useState(0);
+    const [totalEarned, setTotalEarned] = useState(0);
+    const [level, setLevel] = useState("Bronze");
+    const [nextLevelPoints, setNextLevelPoints] = useState(1000);
+    const [transactions, setTransactions] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [hostId, setHostId] = useState(null);
+    const [redeeming, setRedeeming] = useState(null);
+    
     const progress = (currentPoints / nextLevelPoints) * 100;
 
     const rewards = [
         {
-            id: 1,
+            id: "featured_listing",
             title: "Featured Listing",
             description: "Get your listing featured for 7 days",
             points: 500,
             icon: <FaStar className="text-2xl text-yellow-500" />,
         },
         {
-            id: 2,
+            id: "premium_badge",
             title: "Premium Badge",
             description: "Show a premium badge on your profile",
             points: 1000,
             icon: <FaTrophy className="text-2xl text-blue-600" />,
         },
         {
-            id: 3,
+            id: "marketing_boost",
             title: "Marketing Boost",
             description: "Get 2x visibility for 30 days",
             points: 2000,
@@ -33,12 +39,74 @@ const PointsRewards = () => {
         },
     ];
 
-    const recentTransactions = [
-        { id: 1, description: "Booking completed", points: +50, date: "2024-01-10" },
-        { id: 2, description: "Review received", points: +25, date: "2024-01-08" },
-        { id: 3, description: "Featured listing", points: -500, date: "2024-01-05" },
-        { id: 4, description: "Booking completed", points: +50, date: "2024-01-03" },
-    ];
+    // Fetch points data
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                setHostId(user.uid);
+                try {
+                    setLoading(true);
+                    const [pointsData, transactionsData] = await Promise.all([
+                        getHostPoints(user.uid),
+                        getPointsTransactions(user.uid)
+                    ]);
+                    
+                    setCurrentPoints(pointsData.currentPoints);
+                    setTotalEarned(pointsData.totalEarned);
+                    setLevel(pointsData.level);
+                    setNextLevelPoints(getNextLevelPoints(pointsData.currentPoints));
+                    setTransactions(transactionsData);
+                } catch (error) {
+                    console.error("Error fetching points data:", error);
+                } finally {
+                    setLoading(false);
+                }
+            } else {
+                setHostId(null);
+                setLoading(false);
+            }
+        });
+        
+        return () => unsubscribe();
+    }, []);
+
+    // Handle reward redemption
+    const handleRedeem = async (reward) => {
+        if (!hostId) return;
+        
+        if (currentPoints < reward.points) {
+            alert("Insufficient points!");
+            return;
+        }
+        
+        if (!window.confirm(`Are you sure you want to redeem "${reward.title}" for ${reward.points} points?`)) {
+            return;
+        }
+        
+        setRedeeming(reward.id);
+        try {
+            await redeemReward(hostId, reward.id, reward.points, reward.title);
+            
+            // Refresh points data
+            const [pointsData, transactionsData] = await Promise.all([
+                getHostPoints(hostId),
+                getPointsTransactions(hostId)
+            ]);
+            
+            setCurrentPoints(pointsData.currentPoints);
+            setTotalEarned(pointsData.totalEarned);
+            setLevel(pointsData.level);
+            setNextLevelPoints(getNextLevelPoints(pointsData.currentPoints));
+            setTransactions(transactionsData);
+            
+            alert(`Successfully redeemed "${reward.title}"!`);
+        } catch (error) {
+            console.error("Error redeeming reward:", error);
+            alert(`Error: ${error.message || "Failed to redeem reward"}`);
+        } finally {
+            setRedeeming(null);
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -111,14 +179,15 @@ const PointsRewards = () => {
                                     {reward.points} pts
                                 </span>
                                 <button
+                                    onClick={() => handleRedeem(reward)}
                                     className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                                        currentPoints >= reward.points
+                                        currentPoints >= reward.points && !redeeming
                                             ? "bg-blue-600 text-white hover:bg-blue-700 shadow-md"
                                             : "bg-gray-200 text-gray-400 cursor-not-allowed"
                                     }`}
-                                    disabled={currentPoints < reward.points}
+                                    disabled={currentPoints < reward.points || redeeming === reward.id}
                                 >
-                                    Redeem
+                                    {redeeming === reward.id ? "Processing..." : "Redeem"}
                                 </button>
                             </div>
                         </div>
@@ -129,29 +198,41 @@ const PointsRewards = () => {
             {/* Recent Transactions */}
             <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Transactions</h3>
-                <div className="space-y-3">
-                    {recentTransactions.map((transaction) => (
-                        <div
-                            key={transaction.id}
-                            className="flex items-center justify-between p-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 rounded-lg transition"
-                        >
-                            <div>
-                                <p className="font-medium text-gray-900">
-                                    {transaction.description}
-                                </p>
-                                <p className="text-sm text-gray-600">{transaction.date}</p>
-                            </div>
-                            <span
-                                className={`font-semibold ${
-                                    transaction.points > 0 ? "text-green-600" : "text-red-600"
-                                }`}
+                {loading ? (
+                    <div className="text-center py-8 text-gray-500">Loading transactions...</div>
+                ) : transactions.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">No transactions yet</div>
+                ) : (
+                    <div className="space-y-3">
+                        {transactions.map((transaction) => (
+                            <div
+                                key={transaction.id}
+                                className="flex items-center justify-between p-3 border-b border-gray-100 last:border-0 hover:bg-gray-50 rounded-lg transition"
                             >
-                                {transaction.points > 0 ? "+" : ""}
-                                {transaction.points} pts
-                            </span>
-                        </div>
-                    ))}
-                </div>
+                                <div>
+                                    <p className="font-medium text-gray-900">
+                                        {transaction.description}
+                                    </p>
+                                    <p className="text-sm text-gray-600">
+                                        {transaction.date.toLocaleDateString('en-US', { 
+                                            year: 'numeric', 
+                                            month: 'short', 
+                                            day: 'numeric' 
+                                        })}
+                                    </p>
+                                </div>
+                                <span
+                                    className={`font-semibold ${
+                                        transaction.points > 0 ? "text-green-600" : "text-red-600"
+                                    }`}
+                                >
+                                    {transaction.points > 0 ? "+" : ""}
+                                    {transaction.points} pts
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
         </div>
     );
