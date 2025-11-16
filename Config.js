@@ -2836,6 +2836,166 @@ export const getPointsTransactions = async (hostId, limit = 50) => {
     }
 };
 
+// Get personalized recommendations for a guest
+export const getRecommendations = async (guestId, category = null, limit = 12) => {
+    try {
+        if (!guestId) {
+            // If no user, return highly rated listings
+            return await getHighlyRatedListings(category, limit);
+        }
+
+        // Get user's previous bookings
+        const bookings = await getGuestBookings(guestId);
+        const completedBookings = bookings.filter(b => b.status === "active" || b.status === "completed");
+        
+        // Get categories from booked listings
+        const bookedCategories = new Set();
+        const bookedListingIds = new Set();
+        for (const booking of completedBookings) {
+            bookedListingIds.add(booking.listingId);
+            try {
+                const bookedListing = await getListing(booking.listingId);
+                if (bookedListing?.category) {
+                    bookedCategories.add(bookedListing.category);
+                }
+            } catch (error) {
+                console.error("Error fetching booked listing:", error);
+            }
+        }
+        
+        // Get user's favorites
+        const favoriteIds = await getFavorites(guestId);
+        
+        // Get all published listings
+        const allListings = await getPublishedListings(category);
+        
+        // Get featured listings (from active rewards)
+        const featuredListings = await getFeaturedListings();
+        const featuredListingIds = new Set(featuredListings.map(l => l.id));
+        
+        // Score and rank listings
+        const scoredListings = allListings.map(listing => {
+            let score = 0;
+            
+            // Base score from rating
+            if (listing.rating) {
+                score += listing.rating * 10; // Higher rating = higher score
+            }
+            
+            // Boost for featured listings
+            if (featuredListingIds.has(listing.id)) {
+                score += 50;
+            }
+            
+            // Boost if in favorites
+            if (favoriteIds.includes(listing.id)) {
+                score += 30;
+            }
+            
+            // Boost if listing is in same category as previous bookings
+            if (bookedCategories.has(listing.category)) {
+                score += 25;
+            }
+            
+            // General boost for users with booking history
+            if (completedBookings.length > 0) {
+                score += 10;
+            }
+            
+            // Boost for listings with more reviews
+            if (listing.reviewsCount) {
+                score += Math.min(listing.reviewsCount * 2, 20); // Max 20 points for reviews
+            }
+            
+            // Boost for newer listings
+            if (listing.createdAt) {
+                const daysSinceCreation = (Date.now() - listing.createdAt.toMillis()) / (1000 * 60 * 60 * 24);
+                if (daysSinceCreation < 30) {
+                    score += 10; // New listings get a boost
+                }
+            }
+            
+            return { ...listing, recommendationScore: score };
+        });
+        
+        // Sort by score (highest first) and remove duplicates
+        scoredListings.sort((a, b) => b.recommendationScore - a.recommendationScore);
+        
+        // Remove listings user has already booked
+        const filteredListings = scoredListings.filter(l => !bookedListingIds.has(l.id));
+        
+        // Return top recommendations
+        return filteredListings.slice(0, limit);
+    } catch (error) {
+        console.error("Error getting recommendations:", error);
+        // Fallback to highly rated listings
+        return await getHighlyRatedListings(category, limit);
+    }
+};
+
+// Get highly rated listings
+const getHighlyRatedListings = async (category = null, limit = 12) => {
+    try {
+        const listings = await getPublishedListings(category);
+        
+        // Sort by rating (highest first), then by reviews count
+        listings.sort((a, b) => {
+            const ratingA = a.rating || 0;
+            const ratingB = b.rating || 0;
+            const reviewsA = a.reviewsCount || 0;
+            const reviewsB = b.reviewsCount || 0;
+            
+            if (ratingB !== ratingA) {
+                return ratingB - ratingA;
+            }
+            return reviewsB - reviewsA;
+        });
+        
+        return listings.slice(0, limit);
+    } catch (error) {
+        console.error("Error getting highly rated listings:", error);
+        return [];
+    }
+};
+
+// Get featured listings (from active rewards)
+const getFeaturedListings = async () => {
+    try {
+        const now = Timestamp.now();
+        const rewardsQuery = query(
+            collection(db, "hostRewards"),
+            where("rewardId", "==", "featured_listing"),
+            where("status", "==", "active")
+        );
+        
+        const rewardsSnapshot = await getDocs(rewardsQuery);
+        const featuredHostIds = new Set();
+        
+        rewardsSnapshot.forEach((doc) => {
+            const reward = doc.data();
+            // Check if reward hasn't expired
+            if (!reward.expiresAt || reward.expiresAt.toMillis() > now.toMillis()) {
+                featuredHostIds.add(reward.hostId);
+            }
+        });
+        
+        // Get listings from featured hosts
+        if (featuredHostIds.size === 0) {
+            return [];
+        }
+        
+        const allListings = await getPublishedListings();
+        const featuredListings = allListings.filter(listing => 
+            featuredHostIds.has(listing.hostId)
+        );
+        
+        return featuredListings;
+    } catch (error) {
+        console.error("Error getting featured listings:", error);
+        return [];
+    }
+};
+
 // Redeem reward
 export const redeemReward = async (hostId, rewardId, rewardPoints, rewardTitle) => {
     try {

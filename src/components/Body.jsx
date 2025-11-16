@@ -3,17 +3,19 @@ import { FaImage, FaHeart, FaRegHeart, FaStar, FaMapMarkerAlt, FaUsers } from "r
 import Home from "./Home";
 import Expiriences from "./Expiriences";
 import Services from "./Services";
-import { getPublishedListings, auth, getFavorites, addFavorite, removeFavorite } from "../../Config";
+import { getPublishedListings, auth, getFavorites, addFavorite, removeFavorite, getRecommendations } from "../../Config";
 import { onAuthStateChanged } from "firebase/auth";
 
-const Body = ({ activeSelection, showDynamicSection = true, onListingClick, searchFilters = {} }) => {
+const Body = ({ activeSelection, showDynamicSection = true, onListingClick, searchFilters = {}, showSuggestions = false, customTitle = "Suggestions & Recommendations" }) => {
     // Debug: Log if onListingClick is provided
     console.log("Body component rendered - onListingClick provided:", !!onListingClick, typeof onListingClick, "activeSelection:", activeSelection);
     
     // State to track favorites
     const [favorites, setFavorites] = useState(new Set());
     const [listings, setListings] = useState([]);
+    const [recommendations, setRecommendations] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [loadingRecommendations, setLoadingRecommendations] = useState(true);
     const [userId, setUserId] = useState(null);
     
     // Use useEffect to log when onListingClick changes
@@ -109,6 +111,72 @@ const Body = ({ activeSelection, showDynamicSection = true, onListingClick, sear
         
         fetchListings();
     }, [activeSelection, searchFilters]);
+
+    // Fetch recommendations
+    useEffect(() => {
+        const fetchRecommendations = async () => {
+            if (!showSuggestions) {
+                setLoadingRecommendations(false);
+                return;
+            }
+            
+            try {
+                setLoadingRecommendations(true);
+                let category = null;
+                
+                // Map activeSelection to category
+                if (activeSelection === "Home") {
+                    category = "Home";
+                } else if (activeSelection === "Experiences") {
+                    category = "Experience";
+                } else if (activeSelection === "Selection") {
+                    category = "Service";
+                }
+                
+                const recommendedListings = await getRecommendations(userId, category, 6);
+                
+                // Transform to component format (same as listings)
+                const transformedRecommendations = recommendedListings.map(listing => {
+                    let imageUrl = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect width='400' height='300' fill='%23f3f4f6'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='18' fill='%239ca3af'%3ENo Image%3C/text%3E%3C/svg%3E";
+                    
+                    if (listing.images && listing.images.length > 0) {
+                        const firstImage = listing.images[0];
+                        if (typeof firstImage === 'string' && firstImage.trim().length > 0 && firstImage.startsWith('data:')) {
+                            imageUrl = firstImage;
+                        }
+                    }
+                    
+                    return {
+                        id: listing.id,
+                        title: listing.title || "Untitled Listing",
+                        price: listing.rate || 0,
+                        rating: listing.rating || null,
+                        image: imageUrl,
+                        photos: listing.images || [],
+                        location: listing.location?.city 
+                            ? `${listing.location.city}${listing.location.address ? `, ${listing.location.address}` : ''}`
+                            : listing.location?.address || "Location not specified",
+                        description: listing.description || "",
+                        currency: "₱",
+                        reviewsCount: listing.reviewsCount || 0,
+                        basics: listing.basics || { guests: 1, bedrooms: 1, beds: 1, bathrooms: 1 },
+                        amenities: listing.amenities || [],
+                        category: listing.category || "Home",
+                        fullListing: listing
+                    };
+                });
+                
+                setRecommendations(transformedRecommendations);
+            } catch (error) {
+                console.error("Error fetching recommendations:", error);
+                setRecommendations([]);
+            } finally {
+                setLoadingRecommendations(false);
+            }
+        };
+        
+        fetchRecommendations();
+    }, [userId, activeSelection, showSuggestions]);
 
     // Toggle favorite status
     const toggleFavorite = async (listingId) => {
@@ -331,8 +399,36 @@ const Body = ({ activeSelection, showDynamicSection = true, onListingClick, sear
         <div className="bg-white py-4 sm:py-8 px-3 sm:px-8 md:px-12 lg:px-16">
             <div className="max-w-7xl mx-auto">
 
-                {/* Dynamic Section based on Selection - Hidden for now, will be implemented with algorithm-based recommendations */}
-                {/* {showDynamicSection && suggestionsrecommendationsComponent()} */}
+                {/* Suggestions & Recommendations Section */}
+                {showSuggestions && (
+                    <div className="mb-12">
+                        <h2 className="text-3xl font-bold text-gray-900 mb-6">
+                            {customTitle}
+                        </h2>
+                        {loadingRecommendations ? (
+                            <div className="text-center py-8 text-gray-500">
+                                <p>Loading recommendations...</p>
+                            </div>
+                        ) : recommendations.length === 0 ? (
+                            <div className="text-center py-8 text-gray-500">
+                                <p>No recommendations available at the moment.</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-6 mb-8">
+                                {recommendations.map((listing) => (
+                                    <ListingCard
+                                        key={listing.id}
+                                        listing={listing}
+                                        itemId={listing.id}
+                                        isFavorited={favorites.has(listing.id)}
+                                        onToggleFavorite={toggleFavorite}
+                                        onListingClick={onListingClick || (() => console.warn("onListingClick not provided to ListingCard"))}
+                                    />
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Listings Section - Airbnb Style */}
                 <div className="mb-16">
