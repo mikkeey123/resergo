@@ -49,7 +49,10 @@ import {
   FaBath,
   FaCheck,
   FaClock,
-  FaInfoCircle
+  FaInfoCircle,
+  FaChevronLeft,
+  FaChevronRight,
+  FaTimes
 } from "react-icons/fa";
 import { getListing, getUserData, saveReview, getListingReviews, updateReview, updateListingRating, auth, db, validateCoupon, createBooking } from "../../Config";
 import { doc, deleteDoc } from "firebase/firestore";
@@ -59,6 +62,7 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
   console.log("ListingDetail component rendered with listing:", listing);
   
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+  const [modalPhotoIndex, setModalPhotoIndex] = useState(0);
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
   const [guests, setGuests] = useState(1);
@@ -186,6 +190,13 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
       })
     );
   };
+  
+  // Handle modal photo index sync when opening modal
+  useEffect(() => {
+    if (showAllPhotos) {
+      setModalPhotoIndex(selectedPhotoIndex);
+    }
+  }, [showAllPhotos, selectedPhotoIndex]);
   
   // Fetch full listing data and host information
   useEffect(() => {
@@ -887,7 +898,10 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
               {/* Main Photo */}
               <div 
                 className="sm:col-span-2 sm:row-span-2 cursor-pointer relative group overflow-hidden bg-white"
-                onClick={() => setShowAllPhotos(true)}
+                onClick={() => {
+                  setModalPhotoIndex(selectedPhotoIndex);
+                  setShowAllPhotos(true);
+                }}
               >
                 {(() => {
                   const mainPhoto = listingData.photos[selectedPhotoIndex] || listingData.photos[0];
@@ -954,7 +968,11 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
                   <div
                     key={`thumb-${index + 1}-${photo?.substring(0, 50)}`}
                     className="cursor-pointer relative group overflow-hidden bg-white"
-                    onClick={() => setSelectedPhotoIndex(index + 1)}
+                    onClick={() => {
+                      const newIndex = index + 1;
+                      setSelectedPhotoIndex(newIndex);
+                      setModalPhotoIndex(newIndex);
+                    }}
                   >
                     <img
                       src={photo}
@@ -997,7 +1015,10 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
           
           {/* Show All Photos Button */}
           <button
-            onClick={() => setShowAllPhotos(true)}
+            onClick={() => {
+              setModalPhotoIndex(selectedPhotoIndex);
+              setShowAllPhotos(true);
+            }}
             className="mt-4 flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors bg-white text-gray-700 font-medium"
           >
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -1909,26 +1930,139 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
         </div>
       </div>
 
-      {/* Photo Modal (simplified) */}
-      {showAllPhotos && (
+      {/* Enhanced Photo Gallery Modal */}
+      {showAllPhotos && photos.length > 0 && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-90 z-50 flex items-center justify-center p-4"
-          onClick={() => setShowAllPhotos(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.85)' }}
+          onClick={(e) => {
+            // Close modal if clicking on backdrop (not on modal content)
+            if (e.target === e.currentTarget) {
+              setShowAllPhotos(false);
+            }
+          }}
         >
-          <div className="max-w-6xl w-full">
+          {/* Blurred Background */}
+          <div className="absolute inset-0 backdrop-blur-sm" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}></div>
+          
+          {/* Modal Content */}
+          <div 
+            className="relative z-10 w-full max-w-7xl mx-auto px-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
             <button
               onClick={() => setShowAllPhotos(false)}
-              className="absolute top-4 right-4 text-white text-2xl"
+              className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-white/90 hover:bg-white flex items-center justify-center transition-colors shadow-lg"
+              aria-label="Close gallery"
             >
-              ×
+              <FaTimes className="text-gray-800 text-xl" />
             </button>
-            <img
-              src={listingData.photos[selectedPhotoIndex]}
-              alt={listingData.title}
-              className="w-full h-auto max-h-[90vh] object-contain"
-            />
+
+            {/* Main Image Container */}
+            <div className="relative bg-gray-800 rounded-lg overflow-hidden mb-4" style={{ minHeight: '70vh' }}>
+              {/* Navigation Arrows */}
+              {photos.length > 1 && (
+                <>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setModalPhotoIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1));
+                    }}
+                    className="absolute left-4 top-1/2 transform -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/90 hover:bg-white flex items-center justify-center transition-colors shadow-lg"
+                    aria-label="Previous image"
+                  >
+                    <FaChevronLeft className="text-gray-800 text-xl" />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setModalPhotoIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1));
+                    }}
+                    className="absolute right-4 top-1/2 transform -translate-y-1/2 z-20 w-12 h-12 rounded-full bg-white/90 hover:bg-white flex items-center justify-center transition-colors shadow-lg"
+                    aria-label="Next image"
+                  >
+                    <FaChevronRight className="text-gray-800 text-xl" />
+                  </button>
+                </>
+              )}
+
+              {/* Main Image */}
+              <div className="flex items-center justify-center h-full p-8">
+                <img
+                  src={photos[modalPhotoIndex]}
+                  alt={`${listingData?.title || 'Listing'} - Image ${modalPhotoIndex + 1}`}
+                  className="max-w-full max-h-[70vh] object-contain rounded-lg"
+                  style={{ 
+                    display: 'block',
+                    width: 'auto',
+                    height: 'auto',
+                    maxWidth: '100%',
+                    maxHeight: '70vh'
+                  }}
+                  onError={(e) => {
+                    console.error('Modal image failed to load');
+                    e.target.style.display = 'none';
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Thumbnail Strip */}
+            <div className="relative">
+              <div className="flex gap-2 overflow-x-auto pb-2 px-2 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800" style={{ scrollbarWidth: 'thin' }}>
+                {photos.map((photo, index) => (
+                  <button
+                    key={`thumb-${index}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setModalPhotoIndex(index);
+                    }}
+                    className={`flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-all ${
+                      modalPhotoIndex === index
+                        ? 'border-white scale-110 shadow-lg'
+                        : 'border-transparent hover:border-white/50 opacity-70 hover:opacity-100'
+                    }`}
+                  >
+                    <img
+                      src={photo}
+                      alt={`Thumbnail ${index + 1}`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  </button>
+                ))}
+              </div>
+              
+              {/* Image Counter */}
+              <div className="text-center mt-3">
+                <span className="text-white text-sm font-medium">
+                  {modalPhotoIndex + 1} / {photos.length}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
+      )}
+
+      {/* Keyboard Navigation */}
+      {showAllPhotos && photos.length > 0 && (
+        <div
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowLeft') {
+              setModalPhotoIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1));
+            } else if (e.key === 'ArrowRight') {
+              setModalPhotoIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1));
+            } else if (e.key === 'Escape') {
+              setShowAllPhotos(false);
+            }
+          }}
+          className="fixed inset-0 z-40"
+          style={{ pointerEvents: 'none' }}
+        />
       )}
 
     </div>
