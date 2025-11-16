@@ -20,9 +20,12 @@ import {
     FaEdit,
     FaCog,
     FaFilter,
-    FaSave
+    FaSave,
+    FaFileContract,
+    FaLock,
+    FaPrint
 } from "react-icons/fa";
-import { auth, getUserData, getUserType, getAllBookings, getAllReviews, getAllListings, getAllUsers, getAllTransactions, getListing, getWalletBalance, saveRulesAndRegulations, getRulesAndRegulations, saveCancellationRules, getCancellationRules, approveWithdrawal, rejectWithdrawal, savePlatformFeePercentage, getPlatformFeePercentage, getFeeTransactions, getFeeStatistics } from "../../Config";
+import { auth, getUserData, getUserType, getAllBookings, getAllReviews, getAllListings, getAllUsers, getAllTransactions, getListing, getWalletBalance, saveRulesAndRegulations, getRulesAndRegulations, saveCancellationRules, getCancellationRules, approveWithdrawal, rejectWithdrawal, savePlatformFeePercentage, getPlatformFeePercentage, getFeeTransactions, getFeeStatistics, saveTermsAndConditions, getTermsAndConditions, savePrivacyPolicy, getPrivacyPolicy } from "../../Config";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import UserDetails from "../components/UserDetails";
 import EWallet from "../components/EWallet";
@@ -54,6 +57,9 @@ const Adminpage = () => {
         noRefundDays: 1
     });
     const [regulations, setRegulations] = useState("");
+    const [termsAndConditions, setTermsAndConditions] = useState("");
+    const [privacyPolicy, setPrivacyPolicy] = useState("");
+    const [policySubTab, setPolicySubTab] = useState("terms");
     
     // Platform Fee states
     const [platformFeePercentage, setPlatformFeePercentage] = useState(7.5);
@@ -194,17 +200,102 @@ const Adminpage = () => {
         }
     };
 
-    // Fetch policy data (rules & regulations, cancellation rules)
+    // Fetch policy data (rules & regulations, cancellation rules, terms & conditions, privacy policy)
     const fetchPolicyData = async () => {
         try {
-            const [regulationsData, cancellationRulesData] = await Promise.all([
+            const [regulationsData, cancellationRulesData, termsData, privacyData] = await Promise.all([
                 getRulesAndRegulations(),
-                getCancellationRules()
+                getCancellationRules(),
+                getTermsAndConditions(),
+                getPrivacyPolicy()
             ]);
             setRegulations(regulationsData);
             setCancellationRules(cancellationRulesData);
+            setTermsAndConditions(termsData);
+            setPrivacyPolicy(privacyData);
         } catch (error) {
             console.error("Error fetching policy data:", error);
+        }
+    };
+    
+    // Print all policies
+    const handlePrintAllPolicies = () => {
+        const printWindow = window.open('', '_blank');
+        const printContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>ReserGo - All Policies</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; }
+                    h1 { color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; }
+                    h2 { color: #1e40af; margin-top: 30px; }
+                    .section { margin-bottom: 40px; }
+                    @media print {
+                        body { padding: 0; }
+                        .no-print { display: none; }
+                    }
+                </style>
+            </head>
+            <body>
+                <h1>ReserGo - All Policies</h1>
+                <p><strong>Printed on:</strong> ${new Date().toLocaleString()}</p>
+                
+                <div class="section">
+                    <h2>Terms & Conditions</h2>
+                    <div>${termsAndConditions || 'No terms & conditions set.'}</div>
+                </div>
+                
+                <div class="section">
+                    <h2>Rules & Regulations</h2>
+                    <div>${regulations || 'No rules & regulations set.'}</div>
+                </div>
+                
+                <div class="section">
+                    <h2>Privacy Policy</h2>
+                    <div>${privacyPolicy || 'No privacy policy set.'}</div>
+                </div>
+                
+                <div class="section">
+                    <h2>Cancellation Rules</h2>
+                    <div>
+                        <p><strong>Free Cancellation:</strong> ${cancellationRules.freeCancellation ? 'Enabled' : 'Disabled'}</p>
+                        ${cancellationRules.freeCancellation ? `
+                            <p><strong>Free Cancellation Days:</strong> ${cancellationRules.freeCancellationDays} days before check-in</p>
+                            <p><strong>Partial Refund Days:</strong> ${cancellationRules.partialRefundDays} days before check-in</p>
+                            <p><strong>No Refund Days:</strong> ${cancellationRules.noRefundDays} days before check-in</p>
+                        ` : ''}
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+        printWindow.document.write(printContent);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+            printWindow.print();
+        }, 250);
+    };
+    
+    // Save all policies
+    const handleSaveAllPolicies = async () => {
+        try {
+            const promises = [];
+            
+            if (policySubTab === "terms") {
+                promises.push(saveTermsAndConditions(termsAndConditions));
+            } else if (policySubTab === "regulations") {
+                promises.push(saveRulesAndRegulations(regulations));
+            } else if (policySubTab === "privacy") {
+                promises.push(savePrivacyPolicy(privacyPolicy));
+            }
+            
+            await Promise.all(promises);
+            alert("Changes saved successfully!");
+        } catch (error) {
+            console.error("Error saving policies:", error);
+            alert("Failed to save changes. Please try again.");
         }
     };
 
@@ -768,7 +859,107 @@ const Adminpage = () => {
                     {/* Policy & Compliance Tab */}
                     {activeTab === "policies" && (
                         <div className="space-y-6">
-                            {/* Cancellation Rules */}
+                            {/* Header */}
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                                <div>
+                                    <h1 className="text-3xl font-bold text-blue-600 mb-2">Policy & Compliance</h1>
+                                    <p className="text-gray-600">Manage terms, regulations, and privacy policy</p>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={handlePrintAllPolicies}
+                                        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                                    >
+                                        <FaPrint />
+                                        <span>Print All Policies</span>
+                                    </button>
+                                    <button
+                                        onClick={handleSaveAllPolicies}
+                                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                                    >
+                                        <FaSave />
+                                        <span>Save Changes</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Navigation Tabs */}
+                            <div className="flex gap-4 border-b border-gray-200">
+                                <button
+                                    onClick={() => setPolicySubTab("terms")}
+                                    className={`flex items-center gap-2 px-4 py-3 border-b-2 transition ${
+                                        policySubTab === "terms"
+                                            ? "border-blue-600 text-blue-600 font-semibold"
+                                            : "border-transparent text-gray-600 hover:text-gray-900"
+                                    }`}
+                                >
+                                    <FaFileContract />
+                                    <span>Terms & Conditions</span>
+                                </button>
+                                <button
+                                    onClick={() => setPolicySubTab("regulations")}
+                                    className={`flex items-center gap-2 px-4 py-3 border-b-2 transition ${
+                                        policySubTab === "regulations"
+                                            ? "border-blue-600 text-blue-600 font-semibold"
+                                            : "border-transparent text-gray-600 hover:text-gray-900"
+                                    }`}
+                                >
+                                    <FaShieldAlt />
+                                    <span>Rules & Regulations</span>
+                                </button>
+                                <button
+                                    onClick={() => setPolicySubTab("privacy")}
+                                    className={`flex items-center gap-2 px-4 py-3 border-b-2 transition ${
+                                        policySubTab === "privacy"
+                                            ? "border-blue-600 text-blue-600 font-semibold"
+                                            : "border-transparent text-gray-600 hover:text-gray-900"
+                                    }`}
+                                >
+                                    <FaLock />
+                                    <span>Privacy Policy</span>
+                                </button>
+                            </div>
+
+                            {/* Content Area */}
+                            <div className="bg-white rounded-lg shadow-md p-4 md:p-6 border border-gray-200">
+                                {policySubTab === "terms" && (
+                                    <div>
+                                        <h2 className="text-xl font-semibold text-gray-900 mb-4">Terms & Conditions</h2>
+                                        <textarea
+                                            value={termsAndConditions}
+                                            onChange={(e) => setTermsAndConditions(e.target.value)}
+                                            placeholder="Enter terms and conditions..."
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[500px] resize-y"
+                                        />
+                                    </div>
+                                )}
+
+                                {policySubTab === "regulations" && (
+                                    <div>
+                                        <h2 className="text-xl font-semibold text-gray-900 mb-4">Rules & Regulations</h2>
+                                        <textarea
+                                            value={regulations}
+                                            onChange={(e) => setRegulations(e.target.value)}
+                                            placeholder="Enter rules and regulations..."
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[500px] resize-y"
+                                        />
+                                    </div>
+                                )}
+
+                                {policySubTab === "privacy" && (
+                                    <div>
+                                        <h2 className="text-xl font-semibold text-gray-900 mb-4">Privacy Policy</h2>
+                                        <textarea
+                                            value={privacyPolicy}
+                                            onChange={(e) => setPrivacyPolicy(e.target.value)}
+                                            placeholder="Enter privacy policy..."
+                                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[500px] resize-y"
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Cancellation Rules Section */}
                             <div className="bg-white rounded-lg shadow-md p-4 md:p-6 border border-gray-200">
                                 <h2 className="text-xl font-semibold text-gray-900 mb-6">Cancellation Rules</h2>
                                 <div className="space-y-4">
@@ -836,31 +1027,6 @@ const Adminpage = () => {
                                         Save Rules
                                     </button>
                                 </div>
-                            </div>
-
-                            {/* Rules & Regulations */}
-                            <div className="bg-white rounded-lg shadow-md p-4 md:p-6 border border-gray-200">
-                                <h2 className="text-xl font-semibold text-gray-900 mb-6">Rules & Regulations</h2>
-                                <textarea
-                                    value={regulations}
-                                    onChange={(e) => setRegulations(e.target.value)}
-                                    placeholder="Enter rules and regulations..."
-                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[200px]"
-                                />
-                                <button
-                                    onClick={async () => {
-                                        try {
-                                            await saveRulesAndRegulations(regulations);
-                                            alert("Rules & regulations saved successfully!");
-                                        } catch (error) {
-                                            console.error("Error saving rules & regulations:", error);
-                                            alert("Failed to save rules & regulations. Please try again.");
-                                        }
-                                    }}
-                                    className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                                >
-                                    Save Regulations
-                                </button>
                             </div>
                         </div>
                     )}

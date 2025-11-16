@@ -2587,6 +2587,70 @@ export const getRulesAndRegulations = async () => {
     }
 };
 
+// Save Terms & Conditions (Admin only)
+export const saveTermsAndConditions = async (terms) => {
+    try {
+        const termsRef = doc(db, "platformSettings", "termsAndConditions");
+        await setDoc(termsRef, {
+            terms: terms,
+            updatedAt: serverTimestamp()
+        }, { merge: true });
+        console.log("Terms & Conditions saved successfully");
+        return true;
+    } catch (error) {
+        console.error("Error saving terms & conditions:", error);
+        throw error;
+    }
+};
+
+// Get Terms & Conditions
+export const getTermsAndConditions = async () => {
+    try {
+        const termsRef = doc(db, "platformSettings", "termsAndConditions");
+        const termsDoc = await getDoc(termsRef);
+        
+        if (termsDoc.exists()) {
+            return termsDoc.data().terms || "";
+        }
+        return "";
+    } catch (error) {
+        console.error("Error fetching terms & conditions:", error);
+        return "";
+    }
+};
+
+// Save Privacy Policy (Admin only)
+export const savePrivacyPolicy = async (policy) => {
+    try {
+        const policyRef = doc(db, "platformSettings", "privacyPolicy");
+        await setDoc(policyRef, {
+            policy: policy,
+            updatedAt: serverTimestamp()
+        }, { merge: true });
+        console.log("Privacy Policy saved successfully");
+        return true;
+    } catch (error) {
+        console.error("Error saving privacy policy:", error);
+        throw error;
+    }
+};
+
+// Get Privacy Policy
+export const getPrivacyPolicy = async () => {
+    try {
+        const policyRef = doc(db, "platformSettings", "privacyPolicy");
+        const policyDoc = await getDoc(policyRef);
+        
+        if (policyDoc.exists()) {
+            return policyDoc.data().policy || "";
+        }
+        return "";
+    } catch (error) {
+        console.error("Error fetching privacy policy:", error);
+        return "";
+    }
+};
+
 // Save Cancellation Rules (Admin only)
 export const saveCancellationRules = async (cancellationRules) => {
     try {
@@ -2790,4 +2854,4 @@ export const getFeeStatistics = async () => {
     }
 };
 
-export { auth, db, googleProvider, handleGoogleSignup, checkUserExists, checkAccountComplete, saveGoogleUserData, saveAdminUserData, saveHostUserData, getUserData, getUserType, updatePasswordInFirestore, verifyPassword, updateProfilePicture, updateUserProfile, updateUserType, linkEmailPasswordToGoogleAccount, saveListing, updateListing, getListing, deleteListing, getHostListings, getPublishedListings, saveReview, getListingReviews, updateListingRating, updateReview };
+export { auth, db, googleProvider, handleGoogleSignup, checkUserExists, checkAccountComplete, saveGoogleUserData, saveAdminUserData, saveHostUserData, getUserData, getUserType, updatePasswordInFirestore, verifyPassword, updateProfilePicture, updateUserProfile, updateUserType, linkEmailPasswordToGoogleAccount, saveListing, updateListing, getListing, deleteListing, getHostListings, getPublishedListings, saveReview, getListingReviews, updateListingRating, updateReview, saveTermsAndConditions, getTermsAndConditions, savePrivacyPolicy, getPrivacyPolicy };
