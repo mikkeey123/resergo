@@ -23,7 +23,11 @@ import {
     FaSave,
     FaFileContract,
     FaLock,
-    FaPrint
+    FaPrint,
+    FaSearch,
+    FaFilePdf,
+    FaFileExcel,
+    FaCreditCard
 } from "react-icons/fa";
 import { auth, getUserData, getUserType, getAllBookings, getAllReviews, getAllListings, getAllUsers, getAllTransactions, getListing, getWalletBalance, saveRulesAndRegulations, getRulesAndRegulations, saveCancellationRules, getCancellationRules, approveWithdrawal, rejectWithdrawal, savePlatformFeePercentage, getPlatformFeePercentage, getFeeTransactions, getFeeStatistics, saveTermsAndConditions, getTermsAndConditions, savePrivacyPolicy, getPrivacyPolicy } from "../../Config";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -73,6 +77,25 @@ const Adminpage = () => {
         pendingTransfers: 0
     });
     const [loadingFees, setLoadingFees] = useState(false);
+    
+    // Report Generation states
+    const [selectedReportType, setSelectedReportType] = useState("financial");
+    const [reportStartDate, setReportStartDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]);
+    const [reportEndDate, setReportEndDate] = useState(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0]);
+    const [reportData, setReportData] = useState([]);
+    const [reportSummary, setReportSummary] = useState({
+        totalRevenue: 0,
+        platformFees: 0,
+        totalPayouts: 0,
+        netRevenue: 0
+    });
+    const [reportFilters, setReportFilters] = useState({
+        search: "",
+        status: "All",
+        minAmount: "",
+        maxAmount: ""
+    });
+    const [generatingReport, setGeneratingReport] = useState(false);
 
     // Function to fetch and update user data
     const fetchUserData = async (user) => {
@@ -405,34 +428,219 @@ const Adminpage = () => {
         }
     }, [bookings]);
 
-    // Generate report
-    const generateReport = async (type) => {
+    // Generate report data based on type and date range
+    const generateReportData = async () => {
         try {
-            let reportData = "";
-            let filename = "";
-
-            if (type === "bookings") {
-                reportData = "Booking ID,Guest,Host,Listing,Check-in,Check-out,Amount,Status\n";
-                formattedBookings.forEach(b => {
-                    reportData += `${b.id},${b.guestName},${b.hostName},${b.listingTitle},${b.checkInDate},${b.checkOutDate},${b.amount},${b.status}\n`;
+            setGeneratingReport(true);
+            const startDate = new Date(reportStartDate);
+            const endDate = new Date(reportEndDate);
+            endDate.setHours(23, 59, 59, 999); // Include full end date
+            
+            let data = [];
+            let summary = {
+                totalRevenue: 0,
+                platformFees: 0,
+                totalPayouts: 0,
+                netRevenue: 0
+            };
+            
+            if (selectedReportType === "financial") {
+                // Get bookings within date range
+                const filteredBookings = bookings.filter(booking => {
+                    const bookingDate = booking.createdAt?.toDate() || new Date(0);
+                    return bookingDate >= startDate && bookingDate <= endDate;
                 });
-                filename = `bookings-report-${new Date().toISOString().split('T')[0]}.csv`;
-            } else if (type === "reviews") {
-                reportData = "Review ID,Guest,Listing,Rating,Comment,Date\n";
-                reviews.forEach(r => {
-                    reportData += `${r.id},${r.guestId},${r.listingId},${r.rating},${(r.comment || "").replace(/,/g, ";")},${r.createdAt?.toDate().toLocaleDateString() || "N/A"}\n`;
+                
+                // Get platform fee percentage
+                const feeConfig = await getPlatformFeePercentage();
+                const platformFeePercent = feeConfig.percentage;
+                
+                // Process bookings for financial report
+                data = filteredBookings.map(booking => {
+                    const bookingDate = booking.createdAt?.toDate() || new Date();
+                    const amount = booking.totalAmount || 0;
+                    const platformFee = (amount * platformFeePercent) / 100;
+                    const hostPayout = amount - platformFee;
+                    
+                    return {
+                        id: booking.id,
+                        amount: amount,
+                        status: booking.status === "active" ? "confirmed" : booking.status === "cancel_requested" || booking.status === "canceled" ? "cancelled" : booking.status,
+                        date: bookingDate
+                    };
                 });
-                filename = `reviews-report-${new Date().toISOString().split('T')[0]}.csv`;
-            } else if (type === "users") {
-                reportData = "User ID,Username,Email,User Type,Phone Number\n";
-                users.forEach(u => {
-                    reportData += `${u.id},${u.Username || "N/A"},${u.Email || "N/A"},${u.UserType || "N/A"},${u.Number || "N/A"}\n`;
+                
+                // Calculate summary
+                const confirmedBookings = data.filter(b => b.status === "confirmed");
+                summary.totalRevenue = confirmedBookings.reduce((sum, b) => sum + b.amount, 0);
+                summary.platformFees = (summary.totalRevenue * platformFeePercent) / 100;
+                summary.totalPayouts = confirmedBookings.reduce((sum, b) => {
+                    const fee = (b.amount * platformFeePercent) / 100;
+                    return sum + (b.amount - fee);
+                }, 0);
+                summary.netRevenue = summary.platformFees;
+                
+            } else if (selectedReportType === "booking") {
+                const filteredBookings = bookings.filter(booking => {
+                    const bookingDate = booking.createdAt?.toDate() || new Date(0);
+                    return bookingDate >= startDate && bookingDate <= endDate;
                 });
-                filename = `users-report-${new Date().toISOString().split('T')[0]}.csv`;
+                
+                data = filteredBookings.map(booking => ({
+                    id: booking.id,
+                    guestName: booking.guestName || "Guest",
+                    hostName: booking.hostName || "Host",
+                    listingTitle: booking.listingTitle || "Unknown",
+                    checkIn: booking.checkIn?.toDate() || null,
+                    checkOut: booking.checkOut?.toDate() || null,
+                    amount: booking.totalAmount || 0,
+                    status: booking.status
+                }));
+                
+            } else if (selectedReportType === "user") {
+                data = users.map(user => ({
+                    id: user.id,
+                    username: user.Username || "N/A",
+                    email: user.googleAcc || user.Email || "N/A",
+                    userType: user.UserType || "N/A",
+                    phoneNumber: user.Number || "N/A"
+                }));
+                
+            } else if (selectedReportType === "listing") {
+                data = listings.filter(l => !l.isDraft).map(listing => ({
+                    id: listing.id,
+                    title: listing.title || "Untitled",
+                    category: listing.category || "Home",
+                    rate: listing.rate || 0,
+                    rating: listing.rating || 0,
+                    reviewsCount: listing.reviewsCount || 0,
+                    hostId: listing.hostId
+                }));
+                
+            } else if (selectedReportType === "review") {
+                const filteredReviews = reviews.filter(review => {
+                    const reviewDate = review.createdAt?.toDate() || new Date(0);
+                    return reviewDate >= startDate && reviewDate <= endDate;
+                });
+                
+                data = filteredReviews.map(review => ({
+                    id: review.id,
+                    guestName: review.guestName || "Guest",
+                    listingTitle: review.listingId, // You might want to fetch the actual listing title
+                    rating: review.rating || 0,
+                    comment: review.comment || "",
+                    date: review.createdAt?.toDate() || new Date()
+                }));
+                
+            } else if (selectedReportType === "transaction") {
+                const filteredTransactions = transactions.filter(transaction => {
+                    const transactionDate = transaction.createdAt?.toDate() || new Date(0);
+                    return transactionDate >= startDate && transactionDate <= endDate;
+                });
+                
+                data = filteredTransactions.map(transaction => ({
+                    id: transaction.id,
+                    userId: transaction.userId,
+                    type: transaction.type,
+                    amount: transaction.amount || 0,
+                    description: transaction.description || "",
+                    status: transaction.status || "completed",
+                    date: transaction.createdAt?.toDate() || new Date()
+                }));
             }
-
-            // Download CSV
-            const blob = new Blob([reportData], { type: 'text/csv' });
+            
+            setReportData(data);
+            setReportSummary(summary);
+        } catch (error) {
+            console.error("Error generating report:", error);
+            alert("Failed to generate report. Please try again.");
+        } finally {
+            setGeneratingReport(false);
+        }
+    };
+    
+    // Filter report data
+    const getFilteredReportData = () => {
+        let filtered = [...reportData];
+        
+        if (selectedReportType === "financial") {
+            // Apply filters for financial report
+            if (reportFilters.search) {
+                const searchLower = reportFilters.search.toLowerCase();
+                filtered = filtered.filter(item => 
+                    item.id.toLowerCase().includes(searchLower)
+                );
+            }
+            
+            if (reportFilters.status !== "All") {
+                filtered = filtered.filter(item => item.status === reportFilters.status.toLowerCase());
+            }
+            
+            if (reportFilters.minAmount) {
+                const min = parseFloat(reportFilters.minAmount);
+                filtered = filtered.filter(item => item.amount >= min);
+            }
+            
+            if (reportFilters.maxAmount) {
+                const max = parseFloat(reportFilters.maxAmount);
+                filtered = filtered.filter(item => item.amount <= max);
+            }
+        }
+        
+        return filtered;
+    };
+    
+    // Export to CSV
+    const exportToCSV = () => {
+        try {
+            const filtered = getFilteredReportData();
+            let csvContent = "";
+            let filename = "";
+            
+            if (selectedReportType === "financial") {
+                csvContent = "ID,Amount,Status,Date\n";
+                filtered.forEach(item => {
+                    const date = item.date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                    csvContent += `${item.id},₱${item.amount.toFixed(2)},${item.status},${date}\n`;
+                });
+                filename = `financial-report-${reportStartDate}-to-${reportEndDate}.csv`;
+            } else if (selectedReportType === "booking") {
+                csvContent = "ID,Guest,Host,Listing,Check-in,Check-out,Amount,Status\n";
+                filtered.forEach(item => {
+                    const checkIn = item.checkIn ? item.checkIn.toLocaleDateString() : "N/A";
+                    const checkOut = item.checkOut ? item.checkOut.toLocaleDateString() : "N/A";
+                    csvContent += `${item.id},${item.guestName},${item.hostName},${item.listingTitle},${checkIn},${checkOut},₱${item.amount.toFixed(2)},${item.status}\n`;
+                });
+                filename = `booking-report-${reportStartDate}-to-${reportEndDate}.csv`;
+            } else if (selectedReportType === "user") {
+                csvContent = "ID,Username,Email,User Type,Phone Number\n";
+                filtered.forEach(item => {
+                    csvContent += `${item.id},${item.username},${item.email},${item.userType},${item.phoneNumber}\n`;
+                });
+                filename = `user-report-${new Date().toISOString().split('T')[0]}.csv`;
+            } else if (selectedReportType === "listing") {
+                csvContent = "ID,Title,Category,Rate,Rating,Reviews Count\n";
+                filtered.forEach(item => {
+                    csvContent += `${item.id},${item.title},${item.category},₱${item.rate.toFixed(2)},${item.rating.toFixed(1)},${item.reviewsCount}\n`;
+                });
+                filename = `listing-report-${new Date().toISOString().split('T')[0]}.csv`;
+            } else if (selectedReportType === "review") {
+                csvContent = "ID,Guest,Listing,Rating,Comment,Date\n";
+                filtered.forEach(item => {
+                    const date = item.date.toLocaleDateString();
+                    csvContent += `${item.id},${item.guestName},${item.listingTitle},${item.rating},${(item.comment || "").replace(/,/g, ";")},${date}\n`;
+                });
+                filename = `review-report-${reportStartDate}-to-${reportEndDate}.csv`;
+            } else if (selectedReportType === "transaction") {
+                csvContent = "ID,User ID,Type,Amount,Description,Status,Date\n";
+                filtered.forEach(item => {
+                    const date = item.date.toLocaleDateString();
+                    csvContent += `${item.id},${item.userId},${item.type},₱${item.amount.toFixed(2)},${item.description},${item.status},${date}\n`;
+                });
+                filename = `transaction-report-${reportStartDate}-to-${reportEndDate}.csv`;
+            }
+            
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -440,8 +648,118 @@ const Adminpage = () => {
             a.click();
             window.URL.revokeObjectURL(url);
         } catch (error) {
-            console.error("Error generating report:", error);
-            alert("Failed to generate report. Please try again.");
+            console.error("Error exporting CSV:", error);
+            alert("Failed to export CSV. Please try again.");
+        }
+    };
+    
+    // Export to PDF
+    const exportToPDF = () => {
+        try {
+            const filtered = getFilteredReportData();
+            const printWindow = window.open('', '_blank');
+            
+            let reportTitle = "";
+            switch (selectedReportType) {
+                case "financial": reportTitle = "Financial Reports"; break;
+                case "booking": reportTitle = "Booking Reports"; break;
+                case "user": reportTitle = "User Reports"; break;
+                case "listing": reportTitle = "Listing Reports"; break;
+                case "review": reportTitle = "Review Reports"; break;
+                case "transaction": reportTitle = "Transaction Reports"; break;
+            }
+            
+            let tableContent = "";
+            if (selectedReportType === "financial") {
+                tableContent = `
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                        <thead>
+                            <tr style="background-color: #f3f4f6;">
+                                <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">ID</th>
+                                <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Amount</th>
+                                <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Status</th>
+                                <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${filtered.map(item => {
+                                const date = item.date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                                return `
+                                    <tr>
+                                        <td style="padding: 8px; border: 1px solid #ddd;">${item.id.substring(0, 12)}...</td>
+                                        <td style="padding: 8px; border: 1px solid #ddd;">₱${item.amount.toFixed(2)}</td>
+                                        <td style="padding: 8px; border: 1px solid #ddd;">${item.status}</td>
+                                        <td style="padding: 8px; border: 1px solid #ddd;">${date}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                `;
+            }
+            
+            const printContent = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>${reportTitle} - ReserGo</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; }
+                        h1 { color: #2563eb; margin-bottom: 10px; }
+                        .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin: 20px 0; }
+                        .summary-card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; }
+                        .summary-label { font-size: 12px; color: #666; margin-bottom: 5px; }
+                        .summary-value { font-size: 20px; font-weight: bold; color: #333; }
+                        @media print {
+                            body { padding: 0; }
+                            .no-print { display: none; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <h1>${reportTitle}</h1>
+                    <p><strong>Date Range:</strong> ${reportStartDate} to ${reportEndDate}</p>
+                    <p><strong>Generated:</strong> ${new Date().toLocaleString()}</p>
+                    
+                    ${selectedReportType === "financial" ? `
+                        <div class="summary">
+                            <div class="summary-card">
+                                <div class="summary-label">TOTAL REVENUE</div>
+                                <div class="summary-value">₱${reportSummary.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-label">PLATFORM FEES</div>
+                                <div class="summary-value">₱${reportSummary.platformFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-label">TOTAL PAYOUTS</div>
+                                <div class="summary-value">₱${reportSummary.totalPayouts.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                            </div>
+                            <div class="summary-card">
+                                <div class="summary-label">NET REVENUE</div>
+                                <div class="summary-value">₱${reportSummary.netRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${tableContent}
+                    
+                    <p style="margin-top: 30px; font-size: 12px; color: #666;">
+                        Total Records: ${filtered.length}
+                    </p>
+                </body>
+                </html>
+            `;
+            
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => {
+                printWindow.print();
+            }, 250);
+        } catch (error) {
+            console.error("Error exporting PDF:", error);
+            alert("Failed to export PDF. Please try again.");
         }
     };
 
@@ -652,7 +970,7 @@ const Adminpage = () => {
 
                 {/* Content Area */}
                 <div className="flex-1 overflow-y-auto p-4 md:p-6">
-                    {loading && activeTab !== "settings" && activeTab !== "serviceFees" && (
+                    {loading && activeTab !== "settings" && activeTab !== "serviceFees" && activeTab !== "reports" && (
                         <div className="flex items-center justify-center h-64">
                             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
                         </div>
@@ -1033,33 +1351,313 @@ const Adminpage = () => {
 
                     {/* Reports Tab */}
                     {activeTab === "reports" && (
-                        <div className="bg-white rounded-lg shadow-md p-4 md:p-6 border border-gray-200">
-                            <h2 className="text-xl font-semibold text-gray-900 mb-6">Generate Reports</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <button
-                                    onClick={() => generateReport("bookings")}
-                                    className="flex flex-col items-center gap-3 p-6 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-                                >
-                                    <FaCalendarAlt className="text-4xl text-blue-600" />
-                                    <span className="font-semibold text-gray-900">Bookings Report</span>
-                                    <span className="text-sm text-gray-600">Download CSV</span>
-                                </button>
-                                <button
-                                    onClick={() => generateReport("reviews")}
-                                    className="flex flex-col items-center gap-3 p-6 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-                                >
-                                    <FaStar className="text-4xl text-blue-600" />
-                                    <span className="font-semibold text-gray-900">Reviews Report</span>
-                                    <span className="text-sm text-gray-600">Download CSV</span>
-                                </button>
-                                <button
-                                    onClick={() => generateReport("users")}
-                                    className="flex flex-col items-center gap-3 p-6 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition"
-                                >
-                                    <FaUsers className="text-4xl text-blue-600" />
-                                    <span className="font-semibold text-gray-900">Users Report</span>
-                                    <span className="text-sm text-gray-600">Download CSV</span>
-                                </button>
+                        <div className="space-y-6">
+                            {/* Header */}
+                            <div>
+                                <h1 className="text-3xl font-bold text-gray-900 mb-2">Report Generation</h1>
+                                <p className="text-gray-600">Generate and export comprehensive platform reports</p>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                {/* Left Column: Report Type Selection */}
+                                <div className="lg:col-span-1">
+                                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Report Type</h2>
+                                    <div className="space-y-3">
+                                        {[
+                                            { id: "financial", label: "Financial Reports", icon: <FaDollarSign />, description: "Revenue, fees, payouts" },
+                                            { id: "booking", label: "Booking Reports", icon: <FaCalendarAlt />, description: "Booking statistics and trends" },
+                                            { id: "user", label: "User Reports", icon: <FaUsers />, description: "User growth and activity" },
+                                            { id: "listing", label: "Listing Reports", icon: <FaHome />, description: "Listing performance metrics" },
+                                            { id: "review", label: "Review Reports", icon: <FaStar />, description: "Review analytics and ratings" },
+                                            { id: "transaction", label: "Transaction Reports", icon: <FaCreditCard />, description: "All transaction records" }
+                                        ].map((type) => (
+                                            <button
+                                                key={type.id}
+                                                onClick={() => {
+                                                    setSelectedReportType(type.id);
+                                                    setReportData([]);
+                                                    setReportSummary({ totalRevenue: 0, platformFees: 0, totalPayouts: 0, netRevenue: 0 });
+                                                }}
+                                                className={`w-full flex items-start gap-3 p-4 rounded-lg border-2 transition text-left ${
+                                                    selectedReportType === type.id
+                                                        ? "border-blue-600 bg-blue-50"
+                                                        : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                                                }`}
+                                            >
+                                                <div className={`text-2xl ${selectedReportType === type.id ? "text-blue-600" : "text-gray-600"}`}>
+                                                    {type.icon}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <h3 className={`font-semibold mb-1 ${selectedReportType === type.id ? "text-blue-600" : "text-gray-900"}`}>
+                                                        {type.label}
+                                                    </h3>
+                                                    <p className="text-sm text-gray-600">{type.description}</p>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Right Column: Configuration, Summary, and Preview */}
+                                <div className="lg:col-span-2 space-y-6">
+                                    {/* Report Configuration */}
+                                    <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                                        <h2 className="text-lg font-semibold text-gray-900 mb-4">Report Configuration</h2>
+                                        <div className="space-y-4">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                                                    <div className="relative">
+                                                        <input
+                                                            type="date"
+                                                            value={reportStartDate}
+                                                            onChange={(e) => setReportStartDate(e.target.value)}
+                                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        />
+                                                        <FaCalendarAlt className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+                                                    <div className="relative">
+                                                        <input
+                                                            type="date"
+                                                            value={reportEndDate}
+                                                            onChange={(e) => setReportEndDate(e.target.value)}
+                                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        />
+                                                        <FaCalendarAlt className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-3">
+                                                <button
+                                                    onClick={generateReportData}
+                                                    disabled={generatingReport}
+                                                    className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <FaFileAlt />
+                                                    <span>Generate Report</span>
+                                                </button>
+                                                <button
+                                                    onClick={exportToCSV}
+                                                    disabled={reportData.length === 0}
+                                                    className="flex items-center gap-2 px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <FaFileExcel />
+                                                    <span>Export CSV</span>
+                                                </button>
+                                                <button
+                                                    onClick={exportToPDF}
+                                                    disabled={reportData.length === 0}
+                                                    className="flex items-center gap-2 px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    <FaFilePdf />
+                                                    <span>Export PDF</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Report Summary (for Financial Reports) */}
+                                    {selectedReportType === "financial" && reportData.length > 0 && (
+                                        <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                                            <h2 className="text-lg font-semibold text-gray-900 mb-4">Report Summary</h2>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                                    <p className="text-xs text-gray-600 mb-1">TOTAL REVENUE</p>
+                                                    <p className="text-xl font-bold text-gray-900">
+                                                        ₱{reportSummary.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </p>
+                                                </div>
+                                                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                                    <p className="text-xs text-gray-600 mb-1">PLATFORM FEES</p>
+                                                    <p className="text-xl font-bold text-gray-900">
+                                                        ₱{reportSummary.platformFees.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </p>
+                                                </div>
+                                                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                                    <p className="text-xs text-gray-600 mb-1">TOTAL PAYOUTS</p>
+                                                    <p className="text-xl font-bold text-gray-900">
+                                                        ₱{reportSummary.totalPayouts.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </p>
+                                                </div>
+                                                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                                                    <p className="text-xs text-gray-600 mb-1">NET REVENUE</p>
+                                                    <p className="text-xl font-bold text-gray-900">
+                                                        ₱{reportSummary.netRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Report Preview */}
+                                    {reportData.length > 0 && (
+                                        <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div>
+                                                    <h2 className="text-lg font-semibold text-gray-900">Report Preview</h2>
+                                                    <p className="text-sm text-gray-600 mt-1">
+                                                        Date Range: {reportStartDate} to {reportEndDate}
+                                                    </p>
+                                                </div>
+                                                <span className="text-sm font-medium text-blue-600">
+                                                    {selectedReportType === "financial" ? "$ Financial Reports" :
+                                                     selectedReportType === "booking" ? "Booking Reports" :
+                                                     selectedReportType === "user" ? "User Reports" :
+                                                     selectedReportType === "listing" ? "Listing Reports" :
+                                                     selectedReportType === "review" ? "Review Reports" :
+                                                     "Transaction Reports"}
+                                                </span>
+                                            </div>
+
+                                            {/* Filters (for Financial Reports) */}
+                                            {selectedReportType === "financial" && (
+                                                <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                                    <div className="flex items-center gap-2 mb-4">
+                                                        <FaFilter className="text-gray-600" />
+                                                        <h3 className="font-semibold text-gray-900">Filters</h3>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                                        <div className="relative">
+                                                            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Search..."
+                                                                value={reportFilters.search}
+                                                                onChange={(e) => setReportFilters({...reportFilters, search: e.target.value})}
+                                                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                            />
+                                                        </div>
+                                                        <select
+                                                            value={reportFilters.status}
+                                                            onChange={(e) => setReportFilters({...reportFilters, status: e.target.value})}
+                                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        >
+                                                            <option value="All">All Status</option>
+                                                            <option value="confirmed">Confirmed</option>
+                                                            <option value="cancelled">Cancelled</option>
+                                                            <option value="pending">Pending</option>
+                                                        </select>
+                                                        <input
+                                                            type="number"
+                                                            placeholder="Min Amount"
+                                                            value={reportFilters.minAmount}
+                                                            onChange={(e) => setReportFilters({...reportFilters, minAmount: e.target.value})}
+                                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        />
+                                                        <input
+                                                            type="number"
+                                                            placeholder="Max Amount"
+                                                            value={reportFilters.maxAmount}
+                                                            onChange={(e) => setReportFilters({...reportFilters, maxAmount: e.target.value})}
+                                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Report Table */}
+                                            <div>
+                                                <div className="mb-4 text-sm text-gray-600">
+                                                    {selectedReportType === "financial" ? "Bookings" : 
+                                                     selectedReportType === "booking" ? "Bookings" :
+                                                     selectedReportType === "user" ? "Users" :
+                                                     selectedReportType === "listing" ? "Listings" :
+                                                     selectedReportType === "review" ? "Reviews" :
+                                                     "Transactions"} ({getFilteredReportData().length} of {reportData.length})
+                                                </div>
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full">
+                                                        <thead>
+                                                            <tr className="border-b border-gray-200">
+                                                                {selectedReportType === "financial" && (
+                                                                    <>
+                                                                        <th className="text-left py-3 px-4 text-gray-700 font-semibold">ID</th>
+                                                                        <th className="text-left py-3 px-4 text-gray-700 font-semibold">AMOUNT</th>
+                                                                        <th className="text-left py-3 px-4 text-gray-700 font-semibold">STATUS</th>
+                                                                        <th className="text-left py-3 px-4 text-gray-700 font-semibold">DATE</th>
+                                                                    </>
+                                                                )}
+                                                                {selectedReportType === "booking" && (
+                                                                    <>
+                                                                        <th className="text-left py-3 px-4 text-gray-700 font-semibold">ID</th>
+                                                                        <th className="text-left py-3 px-4 text-gray-700 font-semibold">Guest</th>
+                                                                        <th className="text-left py-3 px-4 text-gray-700 font-semibold">Host</th>
+                                                                        <th className="text-left py-3 px-4 text-gray-700 font-semibold">Listing</th>
+                                                                        <th className="text-left py-3 px-4 text-gray-700 font-semibold">Amount</th>
+                                                                        <th className="text-left py-3 px-4 text-gray-700 font-semibold">Status</th>
+                                                                    </>
+                                                                )}
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {getFilteredReportData().map((item) => (
+                                                                <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                                                    {selectedReportType === "financial" && (
+                                                                        <>
+                                                                            <td className="py-3 px-4 text-gray-900 font-mono text-sm">
+                                                                                {item.id.substring(0, 12)}...
+                                                                            </td>
+                                                                            <td className="py-3 px-4 text-gray-900 font-semibold">
+                                                                                ₱{item.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                                            </td>
+                                                                            <td className="py-3 px-4">
+                                                                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                                                                    item.status === "confirmed"
+                                                                                        ? "bg-green-100 text-green-700 border border-green-300"
+                                                                                        : "bg-gray-100 text-gray-700 border border-gray-300"
+                                                                                }`}>
+                                                                                    {item.status}
+                                                                                </span>
+                                                                            </td>
+                                                                            <td className="py-3 px-4 text-gray-700">
+                                                                                {item.date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                                                            </td>
+                                                                        </>
+                                                                    )}
+                                                                    {selectedReportType === "booking" && (
+                                                                        <>
+                                                                            <td className="py-3 px-4 text-gray-900 font-mono text-sm">{item.id.substring(0, 12)}...</td>
+                                                                            <td className="py-3 px-4 text-gray-700">{item.guestName}</td>
+                                                                            <td className="py-3 px-4 text-gray-700">{item.hostName}</td>
+                                                                            <td className="py-3 px-4 text-gray-700">{item.listingTitle}</td>
+                                                                            <td className="py-3 px-4 text-gray-900 font-semibold">₱{item.amount.toFixed(2)}</td>
+                                                                            <td className="py-3 px-4">
+                                                                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                                                                    item.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-700"
+                                                                                }`}>
+                                                                                    {item.status}
+                                                                                </span>
+                                                                            </td>
+                                                                        </>
+                                                                    )}
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Empty State */}
+                                    {reportData.length === 0 && !generatingReport && (
+                                        <div className="bg-white rounded-lg shadow-md p-12 border border-gray-200 text-center">
+                                            <FaFileAlt className="text-6xl text-gray-300 mx-auto mb-4" />
+                                            <p className="text-gray-600">No report data generated yet. Click "Generate Report" to create a report.</p>
+                                        </div>
+                                    )}
+
+                                    {/* Loading State */}
+                                    {generatingReport && (
+                                        <div className="bg-white rounded-lg shadow-md p-12 border border-gray-200 text-center">
+                                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                                            <p className="text-gray-600">Generating report...</p>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )}
