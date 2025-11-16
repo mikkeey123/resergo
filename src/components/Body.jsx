@@ -242,7 +242,7 @@ const Body = ({ activeSelection, showDynamicSection = true, onListingClick, sear
                 onClick={handleCardClick}
             >
                 {/* Image */}
-                <div className="relative rounded-xl overflow-hidden mb-3 aspect-square bg-gray-200">
+                <div className="relative rounded-xl overflow-hidden mb-2 sm:mb-3 aspect-square bg-gray-200">
                     <img
                         src={listing.image}
                         alt={listing.title}
@@ -292,16 +292,16 @@ const Body = ({ activeSelection, showDynamicSection = true, onListingClick, sear
 
                 {/* Card Content - Format: Title on first line, Location on second line, Price • Rating • Guests on third line */}
                 <div>
-                    <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1 text-base">
+                    <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1 text-sm sm:text-base">
                         {listing.title}
                     </h3>
                     {/* Location */}
-                    <div className="flex items-center gap-1 text-sm text-gray-600 mb-1">
+                    <div className="flex items-center gap-1 text-xs sm:text-sm text-gray-600 mb-1">
                         <FaMapMarkerAlt className="text-xs" />
                         <span className="line-clamp-1">{listing.location}</span>
                     </div>
                     {/* Price, Rating, and Max Guests */}
-                    <div className="flex items-center gap-1.5 text-sm text-gray-900 flex-wrap">
+                    <div className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-900 flex-wrap">
                         <span>₱{listing.price.toLocaleString()}</span>
                         {listing.rating !== null && listing.rating > 0 && (
                             <>
@@ -328,7 +328,7 @@ const Body = ({ activeSelection, showDynamicSection = true, onListingClick, sear
     };
 
     return (
-        <div className="bg-white py-8 px-4 sm:px-8 md:px-12 lg:px-16">
+        <div className="bg-white py-4 sm:py-8 px-3 sm:px-8 md:px-12 lg:px-16">
             <div className="max-w-7xl mx-auto">
 
                 {/* Dynamic Section based on Selection - Hidden for now, will be implemented with algorithm-based recommendations */}
@@ -349,7 +349,7 @@ const Body = ({ activeSelection, showDynamicSection = true, onListingClick, sear
                             <p className="text-gray-600">No listings available in this category yet.</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4 md:gap-6">
                             {listings.map((listing) => {
                                 return (
                                     <ListingCard

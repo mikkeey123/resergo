@@ -267,7 +267,7 @@ const Expiriences = ({ onListingClick }) => {
                 onClick={handleCardClick}
             >
                 {/* Image */}
-                <div className="relative rounded-xl overflow-hidden mb-3 aspect-square bg-gray-200">
+                <div className="relative rounded-xl overflow-hidden mb-2 sm:mb-3 aspect-square bg-gray-200">
                     <img
                         src={listing.image}
                         alt={listing.title}
@@ -317,10 +317,10 @@ const Expiriences = ({ onListingClick }) => {
 
                 {/* Card Content - Format: Title on first line, Price • Rating on second line */}
                 <div>
-                    <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1 text-base">
+                    <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1 text-sm sm:text-base">
                         {listing.title}
                     </h3>
-                    <div className="flex items-center gap-1.5 text-sm text-gray-900 flex-wrap">
+                    <div className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-900 flex-wrap">
                         <span>₱{listing.price.toLocaleString()}</span>
                         {listing.rating !== null && listing.rating > 0 && (
                             <>
@@ -351,7 +351,7 @@ const Expiriences = ({ onListingClick }) => {
                     <p className="text-gray-600">No experiences available yet.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 md:gap-6">
                     {experiences.map((experience) => {
                         const itemId = `experience-${experience.id}`;
                         return (

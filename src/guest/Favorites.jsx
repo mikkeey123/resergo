@@ -131,7 +131,7 @@ const Favorites = ({ onBack }) => {
                 onClick={handleCardClick}
             >
                 {/* Image */}
-                <div className="relative rounded-xl overflow-hidden mb-3 aspect-square">
+                <div className="relative rounded-xl overflow-hidden mb-2 sm:mb-3 aspect-square">
                     <img
                         src={listing.image}
                         alt={listing.title}
@@ -173,10 +173,10 @@ const Favorites = ({ onBack }) => {
 
                 {/* Card Content */}
                 <div>
-                    <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1 text-base">
+                    <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1 text-sm sm:text-base">
                         {listing.title}
                     </h3>
-                    <div className="flex items-center gap-1.5 text-sm text-gray-900 flex-wrap">
+                    <div className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-900 flex-wrap">
                         <span>₱{listing.price.toLocaleString()}</span>
                         {listing.rating !== null && listing.rating > 0 && (
                             <>
@@ -194,7 +194,7 @@ const Favorites = ({ onBack }) => {
     };
 
     return (
-        <div className="bg-white py-8 px-4 sm:px-8 md:px-12 lg:px-16 min-h-screen">
+        <div className="bg-white py-4 sm:py-8 px-3 sm:px-8 md:px-12 lg:px-16 min-h-screen">
             <div className="max-w-7xl mx-auto">
                 <div className="mb-8">
                     {onBack && (
@@ -259,7 +259,7 @@ const Favorites = ({ onBack }) => {
                             Showing {filteredListings.length} {filteredListings.length === 1 ? 'favorite' : 'favorites'}
                             {selectedCategory !== "All" && ` in ${selectedCategory}`}
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 sm:gap-4 md:gap-6">
                             {filteredListings.map((listing) => (
                                 <ListingCard
                                     key={listing.id}
