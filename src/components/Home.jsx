@@ -169,7 +169,7 @@ const Home = ({ onListingClick = null }) => {
                 onClick={handleCardClick}
             >
                 {/* Image */}
-                <div className="relative rounded-xl overflow-hidden mb-2 sm:mb-3 aspect-square bg-gray-200">
+                <div className="relative rounded-xl overflow-hidden mb-2 sm:mb-3 aspect-[4/3] sm:aspect-square bg-gray-200">
                     <img
                         src={listing.image}
                         alt={listing.title}
@@ -193,7 +193,7 @@ const Home = ({ onListingClick = null }) => {
                     {/* Heart Icon - Favorite */}
                     <div 
                         ref={heartButtonRef}
-                        className="absolute top-3 right-3 z-20"
+                        className="absolute top-2 right-2 sm:top-3 sm:right-3 z-20"
                         onClick={(e) => {
                             e.stopPropagation();
                             e.preventDefault();
@@ -205,7 +205,7 @@ const Home = ({ onListingClick = null }) => {
                             onClick={handleHeartClick}
                             onMouseDown={handleHeartMouseDown}
                             onTouchStart={handleHeartMouseDown}
-                            className="p-2 bg-white rounded-full shadow-md hover:shadow-lg transition duration-200"
+                            className="p-1.5 sm:p-2 bg-white rounded-full shadow-md hover:shadow-lg transition duration-200"
                             aria-label={isFavorited ? "Remove from favorites" : "Add to favorites"}
                         >
                             {isFavorited ? (
