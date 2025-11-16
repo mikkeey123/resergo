@@ -894,116 +894,177 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
         {/* Photo Gallery Section */}
         <div className="mb-12">
           {listingData.photos && listingData.photos.length > 0 && listingData.photos.some(photo => photo && !photo.includes('No Image') && !photo.includes('fill=\'%23f3f4f6\'')) ? (
-            <div className="grid grid-cols-1 sm:grid-cols-4 sm:grid-rows-2 gap-2 h-[300px] sm:h-[400px] md:h-[500px] lg:h-[600px] rounded-xl overflow-hidden border border-gray-200 shadow-sm">
-              {/* Main Photo */}
-              <div 
-                className="sm:col-span-2 sm:row-span-2 cursor-pointer relative group overflow-hidden bg-white"
-                onClick={() => {
-                  setModalPhotoIndex(selectedPhotoIndex);
-                  setShowAllPhotos(true);
-                }}
-              >
-                {(() => {
-                  const mainPhoto = listingData.photos[selectedPhotoIndex] || listingData.photos[0];
-                  console.log('Rendering main photo:', mainPhoto?.substring(0, 100));
-                  console.log('Main photo is valid:', mainPhoto && (mainPhoto.startsWith('data:image/') || mainPhoto.startsWith('http')));
-                  
-                  // Only render if we have a real image (not placeholder)
-                  if (!mainPhoto || mainPhoto.includes('No Image') || mainPhoto.includes('fill=\'%23f3f4f6\'')) {
-                    console.warn('Main photo is a placeholder, not rendering');
+            <>
+              {/* Mobile: Circular Layout */}
+              <div className="block sm:hidden">
+                {/* Main Circular Photo */}
+                <div className="flex justify-center mb-4">
+                  <div 
+                    className="w-64 h-64 rounded-full overflow-hidden border-2 border-gray-300 shadow-lg cursor-pointer relative group"
+                    onClick={() => {
+                      setModalPhotoIndex(selectedPhotoIndex);
+                      setShowAllPhotos(true);
+                    }}
+                  >
+                    {(() => {
+                      const mainPhoto = listingData.photos[selectedPhotoIndex] || listingData.photos[0];
+                      
+                      if (!mainPhoto || mainPhoto.includes('No Image') || mainPhoto.includes('fill=\'%23f3f4f6\'')) {
+                        return (
+                          <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                            <p className="text-gray-500 text-sm">No image</p>
+                          </div>
+                        );
+                      }
+                      
+                      return (
+                        <img
+                          key={`main-mobile-${selectedPhotoIndex}`}
+                          src={mainPhoto}
+                          alt={listingData.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.style.backgroundColor = '#f3f4f6';
+                          }}
+                        />
+                      );
+                    })()}
+                    <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity pointer-events-none"></div>
+                  </div>
+                </div>
+                
+                {/* Circular Thumbnails Row */}
+                <div className="flex gap-3 justify-center overflow-x-auto pb-2 px-2">
+                  {listingData.photos.slice(0, 5).map((photo, index) => {
+                    if (!photo || photo.includes('No Image') || photo.includes('fill=\'%23f3f4f6\'')) {
+                      return null;
+                    }
+                    
+                    const isSelected = index === selectedPhotoIndex;
+                    
                     return (
-                      <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                        <p className="text-gray-500">No image available</p>
-                      </div>
+                      <button
+                        key={`thumb-mobile-${index}`}
+                        onClick={() => {
+                          setSelectedPhotoIndex(index);
+                          setModalPhotoIndex(index);
+                        }}
+                        className={`flex-shrink-0 w-16 h-16 rounded-full overflow-hidden border-2 transition-all ${
+                          isSelected
+                            ? 'border-blue-500 scale-110 shadow-md'
+                            : 'border-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        <img
+                          src={photo}
+                          alt={`${listingData.title} ${index + 1}`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                          }}
+                        />
+                      </button>
                     );
+                  })}
+                </div>
+              </div>
+
+              {/* Desktop: Grid Layout */}
+              <div className="hidden sm:grid grid-cols-4 grid-rows-2 gap-2 h-[400px] md:h-[500px] lg:h-[600px] rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+                {/* Main Photo */}
+                <div 
+                  className="col-span-2 row-span-2 cursor-pointer relative group overflow-hidden bg-white"
+                  onClick={() => {
+                    setModalPhotoIndex(selectedPhotoIndex);
+                    setShowAllPhotos(true);
+                  }}
+                >
+                  {(() => {
+                    const mainPhoto = listingData.photos[selectedPhotoIndex] || listingData.photos[0];
+                    
+                    if (!mainPhoto || mainPhoto.includes('No Image') || mainPhoto.includes('fill=\'%23f3f4f6\'')) {
+                      return (
+                        <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                          <p className="text-gray-500">No image available</p>
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <img
+                        key={`main-${selectedPhotoIndex}-${mainPhoto?.substring(0, 50)}`}
+                        src={mainPhoto}
+                        alt={listingData.title}
+                        className="w-full h-full object-cover block"
+                        style={{ 
+                          display: 'block',
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          backgroundColor: 'transparent'
+                        }}
+                        onError={(e) => {
+                          console.error('Main photo failed to load');
+                          e.target.onerror = null;
+                          e.target.style.backgroundColor = '#f3f4f6';
+                          e.target.style.display = 'flex';
+                          e.target.style.alignItems = 'center';
+                          e.target.style.justifyContent = 'center';
+                        }}
+                        onLoad={(e) => {
+                          console.log('Main photo loaded successfully');
+                          e.target.style.display = 'block';
+                        }}
+                      />
+                    );
+                  })()}
+                  <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity pointer-events-none z-10"></div>
+                </div>
+                
+                {/* Thumbnail Photos */}
+                {listingData.photos.slice(1, 5).map((photo, index) => {
+                  if (!photo || photo.includes('No Image') || photo.includes('fill=\'%23f3f4f6\'')) {
+                    return null;
                   }
                   
                   return (
-                    <img
-                      key={`main-${selectedPhotoIndex}-${mainPhoto?.substring(0, 50)}`}
-                      src={mainPhoto}
-                      alt={listingData.title}
-                      className="w-full h-full object-cover block"
-                      style={{ 
-                        display: 'block',
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        backgroundColor: 'transparent'
+                    <div
+                      key={`thumb-${index + 1}-${photo?.substring(0, 50)}`}
+                      className="cursor-pointer relative group overflow-hidden bg-white"
+                      onClick={() => {
+                        const newIndex = index + 1;
+                        setSelectedPhotoIndex(newIndex);
+                        setModalPhotoIndex(newIndex);
                       }}
-                      onError={(e) => {
-                        console.error('Main photo failed to load');
-                        console.error('Photo src length:', e.target.src?.length);
-                        console.error('Photo src preview:', e.target.src?.substring(0, 200));
-                        console.error('Photo index:', selectedPhotoIndex);
-                        console.error('Total photos:', listingData.photos.length);
-                        e.target.onerror = null; // Prevent infinite loop
-                        e.target.style.backgroundColor = '#f3f4f6';
-                        e.target.style.display = 'flex';
-                        e.target.style.alignItems = 'center';
-                        e.target.style.justifyContent = 'center';
-                      }}
-                      onLoad={(e) => {
-                        console.log('Main photo loaded successfully');
-                        console.log('Image dimensions:', e.target.naturalWidth, 'x', e.target.naturalHeight);
-                        e.target.style.display = 'block';
-                      }}
-                    />
+                    >
+                      <img
+                        src={photo}
+                        alt={`${listingData.title} ${index + 2}`}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform block"
+                        style={{ 
+                          display: 'block',
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                          backgroundColor: 'transparent'
+                        }}
+                        onError={(e) => {
+                          console.error(`Thumbnail ${index + 1} failed to load`);
+                          e.target.onerror = null;
+                          e.target.style.backgroundColor = '#f3f4f6';
+                        }}
+                        onLoad={(e) => {
+                          console.log(`Thumbnail ${index + 1} loaded successfully`);
+                          e.target.style.display = 'block';
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity pointer-events-none z-10"></div>
+                    </div>
                   );
-                })()}
-                {/* Hover overlay - positioned above image, only on hover */}
-                <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity pointer-events-none z-10"></div>
+                })}
               </div>
-              
-              {/* Thumbnail Photos */}
-              {listingData.photos.slice(1, 5).map((photo, index) => {
-                console.log(`Rendering thumbnail ${index + 1}:`, photo?.substring(0, 100));
-                
-                // Skip placeholder images
-                if (!photo || photo.includes('No Image') || photo.includes('fill=\'%23f3f4f6\'')) {
-                  return null;
-                }
-                
-                return (
-                  <div
-                    key={`thumb-${index + 1}-${photo?.substring(0, 50)}`}
-                    className="cursor-pointer relative group overflow-hidden bg-white"
-                    onClick={() => {
-                      const newIndex = index + 1;
-                      setSelectedPhotoIndex(newIndex);
-                      setModalPhotoIndex(newIndex);
-                    }}
-                  >
-                    <img
-                      src={photo}
-                      alt={`${listingData.title} ${index + 2}`}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform block"
-                      style={{ 
-                        display: 'block',
-                        width: '100%',
-                        height: '100%',
-                        objectFit: 'cover',
-                        backgroundColor: 'transparent'
-                      }}
-                      onError={(e) => {
-                        console.error(`Thumbnail ${index + 1} failed to load`);
-                        console.error('Photo src length:', e.target.src?.length);
-                        console.error('Photo src preview:', e.target.src?.substring(0, 200));
-                        e.target.onerror = null; // Prevent infinite loop
-                        e.target.style.backgroundColor = '#f3f4f6';
-                      }}
-                      onLoad={(e) => {
-                        console.log(`Thumbnail ${index + 1} loaded successfully`);
-                        console.log('Image dimensions:', e.target.naturalWidth, 'x', e.target.naturalHeight);
-                        e.target.style.display = 'block';
-                      }}
-                    />
-                    {/* Hover overlay - positioned above image, only on hover */}
-                    <div className="absolute inset-0 bg-black opacity-0 group-hover:opacity-10 transition-opacity pointer-events-none z-10"></div>
-                  </div>
-                );
-              })}
-            </div>
+            </>
           ) : (
             <div className="h-[500px] md:h-[600px] rounded-xl border border-gray-200 shadow-sm bg-gray-200 flex items-center justify-center">
               <div className="text-center">
