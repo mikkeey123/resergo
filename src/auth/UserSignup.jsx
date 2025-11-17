@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { saveGoogleUserData, auth, googleProvider } from "../../Config";
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, linkWithCredential, signOut, GoogleAuthProvider, EmailAuthProvider } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signInWithPopup, linkWithCredential, signOut, GoogleAuthProvider, EmailAuthProvider, fetchSignInMethodsForEmail } from "firebase/auth";
 import AlertPopup from "../components/AlertPopup";
 import { compressImage } from "../utils/imageCompression";
 
@@ -229,7 +229,7 @@ const UserSignup = ({ title = "Sign Up", loginType = "guest", onNavigateToGuest,
         return;
       }
       
-      // Not a Google signup - create email/password account
+      // Not a Google signup - create email/password account with linking support
       if (!email) {
         setError("Email is required");
         setLoading(false);
@@ -237,20 +237,76 @@ const UserSignup = ({ title = "Sign Up", loginType = "guest", onNavigateToGuest,
       }
 
       try {
-        // Step 1: Create email/password account
-        console.log("Creating email/password account with email:", email);
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-        console.log("Email/password account created successfully with UID:", user.uid);
+        // Step 1: Check if account already exists and what sign-in methods are available
+        let signInMethods = [];
+        try {
+          signInMethods = await fetchSignInMethodsForEmail(auth, email);
+          console.log("Available sign-in methods for this email:", signInMethods);
+        } catch (checkError) {
+          console.log("Email not found in Firebase Auth, will create new account");
+        }
+        
+        let user = null;
+        let isNewAccount = false;
+        
+        // Step 2: Handle account creation/linking
+        if (signInMethods.includes('google.com') && !signInMethods.includes('password')) {
+          // Google account exists but no password - need to link
+          console.log("Google account exists, attempting to link email/password...");
+          
+          // Sign in with Google first
+          const googleResult = await signInWithPopup(auth, googleProvider);
+          const googleUser = googleResult.user;
+          
+          // Verify email matches
+          if (googleUser.email !== email) {
+            await signOut(auth);
+            setError("Email mismatch. The Google account email doesn't match the email you entered.");
+            setLoading(false);
+            return;
+          }
+          
+          // Link email/password credential to Google account
+          try {
+            const emailCredential = EmailAuthProvider.credential(email, password);
+            await linkWithCredential(googleUser, emailCredential);
+            console.log("Email/password credential linked successfully to Google account");
+            user = auth.currentUser;
+          } catch (linkError) {
+            // If linking fails, it might be because password account already exists separately
+            if (linkError.code === 'auth/credential-already-in-use') {
+              // The email/password account exists separately - sign out and sign in with email/password
+              await signOut(auth);
+              const emailPasswordCredential = await signInWithEmailAndPassword(auth, email, password);
+              user = emailPasswordCredential.user;
+              console.log("Signed in with existing email/password account");
+            } else {
+              throw linkError;
+            }
+          }
+        } else if (signInMethods.includes('password')) {
+          // Email/password account already exists
+          console.log("Email/password account exists, signing in...");
+          const emailPasswordCredential = await signInWithEmailAndPassword(auth, email, password);
+          user = emailPasswordCredential.user;
+          console.log("Signed in with existing email/password account");
+        } else {
+          // No account exists - create new one
+          console.log("Creating new email/password account with email:", email);
+          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+          user = userCredential.user;
+          isNewAccount = true;
+          console.log("Email/password account created successfully with UID:", user.uid);
+        }
 
-        // Step 2: Save user data to Firestore
+        // Step 3: Save/update user data to Firestore
         console.log("Saving user data to Firestore with UID:", user.uid, "Username:", username, "Phone:", number, "Email:", email, "UserType:", loginType);
         await saveGoogleUserData(user.uid, username, number, password, loginType, email, profilePicture);
         console.log("User data saved to Firestore successfully");
 
         // Note: Welcome email is sent automatically in saveGoogleUserData function
 
-        setSuccess("Account created successfully! Welcome email sent.");
+        setSuccess(isNewAccount ? "Account created successfully! Welcome email sent." : "Account linked successfully! You can now sign in with email/password or Google.");
         setLoading(false);
 
         // Wait a bit to show success message before navigating
@@ -282,6 +338,10 @@ const UserSignup = ({ title = "Sign Up", loginType = "guest", onNavigateToGuest,
           setError("Invalid email address. Please check your email and try again.");
         } else if (createError.code === 'auth/weak-password') {
           setError("Password is too weak. Please choose a stronger password (at least 6 characters).");
+        } else if (createError.code === 'auth/invalid-credential' || createError.code === 'auth/wrong-password') {
+          setError("Invalid password. If you have a Google account with this email, please use Google sign-in first, then link your password.");
+        } else if (createError.code === 'auth/popup-closed-by-user') {
+          setError("Google sign-in was cancelled. Please try again.");
         } else {
           setError(createError.message || "Failed to create account. Please try again.");
         }
