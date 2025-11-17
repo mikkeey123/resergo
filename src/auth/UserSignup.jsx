@@ -7,6 +7,7 @@ import { compressImage } from "../utils/imageCompression";
 const UserSignup = ({ title = "Sign Up", loginType = "guest", onNavigateToGuest, onNavigateToHost, onClose, onSwitchToLogin, onGoogleSignIn, isGoogleSignup = false, pendingUser = null }) => {
   const [username, setUsername] = useState("");
   const [number, setNumber] = useState("");
+  const [email, setEmail] = useState(pendingUser?.email || auth.currentUser?.email || "");
   const [password, setPassword] = useState("");
   const [profilePicture, setProfilePicture] = useState(null);
   const [profilePicturePreview, setProfilePicturePreview] = useState(null);
@@ -25,6 +26,15 @@ const UserSignup = ({ title = "Sign Up", loginType = "guest", onNavigateToGuest,
       return () => clearTimeout(timer);
     }
   }, [error, success]);
+
+  // Update email when pendingUser changes
+  useEffect(() => {
+    if (pendingUser?.email) {
+      setEmail(pendingUser.email);
+    } else if (auth.currentUser?.email) {
+      setEmail(auth.currentUser.email);
+    }
+  }, [pendingUser]);
 
   const handleProfilePictureChange = async (e) => {
     const file = e.target.files[0];
@@ -69,7 +79,7 @@ const UserSignup = ({ title = "Sign Up", loginType = "guest", onNavigateToGuest,
     try {
       // If this is a Google signup completion, create email/password account first, then link Google
       if (isGoogleSignup) {
-        const userEmail = pendingUser?.email || null;
+        const userEmail = email || pendingUser?.email || null;
         
         if (!userEmail) {
           throw new Error("Email is required to complete account setup");
@@ -328,6 +338,29 @@ const UserSignup = ({ title = "Sign Up", loginType = "guest", onNavigateToGuest,
             className="w-full px-5 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-200"
             placeholder="Enter your phone number"
           />
+        </div>
+
+        {/* Email */}
+        <div className="w-full">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Email address
+          </label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            disabled={isGoogleSignup}
+            className={`w-full px-5 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-200 ${
+              isGoogleSignup ? 'bg-gray-100 cursor-not-allowed' : ''
+            }`}
+            placeholder="Enter your email"
+          />
+          {isGoogleSignup && (
+            <p className="mt-1 text-xs text-gray-500">
+              Email is linked to your Google account
+            </p>
+          )}
         </div>
 
         {/* Password */}
