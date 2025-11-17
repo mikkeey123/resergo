@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { handleGoogleSignup, auth, getUserType, getUserData, updateUserType, saveGoogleUserData, googleProvider } from "../../Config";
+import { handleGoogleSignup, auth, db, getUserType, getUserData, getUserDataByEmail, updateUserType, saveGoogleUserData, googleProvider } from "../../Config";
 import { signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, fetchSignInMethodsForEmail, signInWithPopup, linkWithCredential, EmailAuthProvider } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
 import AlertPopup from "../components/AlertPopup";
 
 const LoginForm = ({ title = "Login", loginType = "guest", onNavigateToGuest, onNavigateToHost, onNavigateToAdmin, onNavigateToHome, onClose, onGoogleSignIn, showSignup = false, onSwitchToSignup }) => {
@@ -55,7 +56,45 @@ const LoginForm = ({ title = "Login", loginType = "guest", onNavigateToGuest, on
       // Authenticate with email/password
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      console.log("Email/password login successful for user:", user.uid);
+      const emailPasswordUid = user.uid;
+      console.log("Email/password login successful for user:", emailPasswordUid);
+      
+      // Check if Google account exists with same email and merge data if needed
+      try {
+        const signInMethods = await fetchSignInMethodsForEmail(auth, email);
+        console.log("Available sign-in methods for email:", signInMethods);
+        
+        if (signInMethods.includes('google.com')) {
+          // Google account exists - check if user data exists for Google account
+          // We need to find the Google account's UID by checking Firestore
+          const existingUserData = await getUserDataByEmail(email);
+          
+          if (existingUserData && existingUserData.uid !== emailPasswordUid) {
+            // User data exists with Google account UID - copy to email/password account
+            console.log("Found Google account data. Syncing to email/password account...");
+            
+            const dataToCopy = {
+              Username: existingUserData.Username,
+              Number: existingUserData.Number,
+              Password: existingUserData.Password || password,
+              UserType: existingUserData.UserType,
+              Email: existingUserData.Email || email,
+              googleAcc: email
+            };
+            
+            if (existingUserData.ProfilePicture) {
+              dataToCopy.ProfilePicture = existingUserData.ProfilePicture;
+            }
+            
+            // Save/update data for email/password account
+            await setDoc(doc(db, "Resergodb", emailPasswordUid), dataToCopy, { merge: true });
+            console.log("User data synced to email/password account UID:", emailPasswordUid);
+          }
+        }
+      } catch (mergeError) {
+        console.log("Could not check/merge Google account data:", mergeError);
+        // Continue with login even if merge fails
+      }
       
       // Check user type and validate against loginType
       try {
@@ -303,8 +342,63 @@ const LoginForm = ({ title = "Login", loginType = "guest", onNavigateToGuest, on
     setError("");
     
     try {
+      // Step 1: Check if email/password account exists with the same email
+      // We'll check this after Google sign-in by checking the email
+      
       // Call handleGoogleSignup for authentication
       const result = await handleGoogleSignup(setError);
+      
+      // Step 2: After Google sign-in, check if email/password account exists and merge data
+      if (result && result.user) {
+        const googleEmail = result.user.email;
+        const googleUser = result.user;
+        const googleUid = googleUser.uid;
+        
+        // Check if user data exists in Firestore for this email (might be from email/password signup)
+        const existingUserData = await getUserDataByEmail(googleEmail);
+        
+        if (existingUserData && existingUserData.uid !== googleUid) {
+          // User data exists with a different UID (from email/password signup)
+          console.log("Found existing user data for email with different UID. Merging data...");
+          console.log("Existing UID:", existingUserData.uid, "Google UID:", googleUid);
+          
+          // Copy user data to Google account's UID so both accounts access the same data
+          const dataToCopy = {
+            Username: existingUserData.Username,
+            Number: existingUserData.Number,
+            Password: existingUserData.Password,
+            UserType: existingUserData.UserType,
+            Email: existingUserData.Email || googleEmail,
+            googleAcc: googleEmail
+          };
+          
+          // Add optional fields if they exist
+          if (existingUserData.ProfilePicture) {
+            dataToCopy.ProfilePicture = existingUserData.ProfilePicture;
+          }
+          
+          // Save/update data for Google account
+          await setDoc(doc(db, "Resergodb", googleUid), dataToCopy, { merge: true });
+          console.log("User data merged to Google account UID:", googleUid);
+          
+          // Check sign-in methods to see if we can link credentials
+          try {
+            const signInMethods = await fetchSignInMethodsForEmail(auth, googleEmail);
+            console.log("Available sign-in methods:", signInMethods);
+            
+            // If password method exists, the accounts are separate but data is now synced
+            // User can sign in with either method and access the same data
+            if (signInMethods.includes('password')) {
+              console.log("Email/password account exists. Data has been synced. User can sign in with either method.");
+            }
+          } catch (checkError) {
+            console.log("Could not check sign-in methods:", checkError);
+          }
+        } else if (existingUserData && existingUserData.uid === googleUid) {
+          // Same UID, data already exists - just ensure it's up to date
+          console.log("User data already exists for Google account UID");
+        }
+      }
       
       if (result && result.isNewUser) {
         // New user - keep authenticated and show signup modal for account setup

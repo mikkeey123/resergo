@@ -233,6 +233,44 @@ const getUserData = async (uid) => {
     }
 };
 
+// Find user data by email in Firestore
+// This helps link accounts when user signs in with different methods
+const getUserDataByEmail = async (email) => {
+    try {
+        if (!email) return null;
+        
+        const usersRef = collection(db, "Resergodb");
+        const q = query(usersRef, where("Email", "==", email));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+            // Return the first matching user document
+            const userDoc = querySnapshot.docs[0];
+            return {
+                uid: userDoc.id,
+                ...userDoc.data()
+            };
+        }
+        
+        // Also check googleAcc field for backward compatibility
+        const q2 = query(usersRef, where("googleAcc", "==", email));
+        const querySnapshot2 = await getDocs(q2);
+        
+        if (!querySnapshot2.empty) {
+            const userDoc = querySnapshot2.docs[0];
+            return {
+                uid: userDoc.id,
+                ...userDoc.data()
+            };
+        }
+        
+        return null;
+    } catch (error) {
+        console.error("Error finding user data by email:", error);
+        return null;
+    }
+};
+
 // Get user type from Firestore
 const getUserType = async (uid) => {
     try {
@@ -3256,4 +3294,4 @@ export const getFeeStatistics = async () => {
     }
 };
 
-export { auth, db, googleProvider, handleGoogleSignup, checkUserExists, checkAccountComplete, saveGoogleUserData, saveAdminUserData, saveHostUserData, getUserData, getUserType, updatePasswordInFirestore, verifyPassword, updateProfilePicture, updateUserProfile, updateUserType, linkEmailPasswordToGoogleAccount, saveListing, updateListing, getListing, deleteListing, getHostListings, getPublishedListings, saveReview, getListingReviews, updateListingRating, updateReview };
+export { auth, db, googleProvider, handleGoogleSignup, checkUserExists, checkAccountComplete, saveGoogleUserData, saveAdminUserData, saveHostUserData, getUserData, getUserDataByEmail, getUserType, updatePasswordInFirestore, verifyPassword, updateProfilePicture, updateUserProfile, updateUserType, linkEmailPasswordToGoogleAccount, saveListing, updateListing, getListing, deleteListing, getHostListings, getPublishedListings, saveReview, getListingReviews, updateListingRating, updateReview };
