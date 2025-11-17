@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { handleGoogleSignup, auth, db, getUserType, getUserData, getUserDataByEmail, updateUserType, saveGoogleUserData, googleProvider } from "../../Config";
-import { signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, fetchSignInMethodsForEmail, signInWithPopup, linkWithCredential, EmailAuthProvider } from "firebase/auth";
+import { handleGoogleSignup, auth, db, getUserType, getUserData, getUserDataByEmail, updateUserType, saveGoogleUserData, googleProvider, checkUserExists, checkAccountComplete } from "../../Config";
+import { signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, fetchSignInMethodsForEmail, signInWithPopup, linkWithCredential, EmailAuthProvider, GoogleAuthProvider } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import AlertPopup from "../components/AlertPopup";
 
@@ -342,62 +342,185 @@ const LoginForm = ({ title = "Login", loginType = "guest", onNavigateToGuest, on
     setError("");
     
     try {
-      // Step 1: Check if email/password account exists with the same email
-      // We'll check this after Google sign-in by checking the email
+      // Step 1: Check if email/password account exists BEFORE Google sign-in
+      // We need to check the email from the form or detect it after Google sign-in
       
-      // Call handleGoogleSignup for authentication
-      const result = await handleGoogleSignup(setError);
+      // First, sign in with Google to get the email and credential
+      // We need to use signInWithPopup directly to get the credential
+      let googleCredentialToLink = null;
+      let googleEmail = null;
+      let googleUser = null;
+      let googleUid = null;
+      let result = null;
       
-      // Step 2: After Google sign-in, check if email/password account exists and merge data
-      if (result && result.user) {
-        const googleEmail = result.user.email;
-        const googleUser = result.user;
-        const googleUid = googleUser.uid;
+      try {
+        // Sign in with Google popup to get credential
+        const googlePopupResult = await signInWithPopup(auth, googleProvider);
+        googleUser = googlePopupResult.user;
+        googleEmail = googleUser.email;
+        googleUid = googleUser.uid;
         
-        // Check if user data exists in Firestore for this email (might be from email/password signup)
-        const existingUserData = await getUserDataByEmail(googleEmail);
+        // Get the credential from the popup result using credentialFromResult
+        googleCredentialToLink = GoogleAuthProvider.credentialFromResult(googlePopupResult);
         
-        if (existingUserData && existingUserData.uid !== googleUid) {
-          // User data exists with a different UID (from email/password signup)
-          console.log("Found existing user data for email with different UID. Merging data...");
-          console.log("Existing UID:", existingUserData.uid, "Google UID:", googleUid);
-          
-          // Copy user data to Google account's UID so both accounts access the same data
-          const dataToCopy = {
-            Username: existingUserData.Username,
-            Number: existingUserData.Number,
-            Password: existingUserData.Password,
-            UserType: existingUserData.UserType,
-            Email: existingUserData.Email || googleEmail,
-            googleAcc: googleEmail
-          };
-          
-          // Add optional fields if they exist
-          if (existingUserData.ProfilePicture) {
-            dataToCopy.ProfilePicture = existingUserData.ProfilePicture;
-          }
-          
-          // Save/update data for Google account
-          await setDoc(doc(db, "Resergodb", googleUid), dataToCopy, { merge: true });
-          console.log("User data merged to Google account UID:", googleUid);
-          
-          // Check sign-in methods to see if we can link credentials
-          try {
-            const signInMethods = await fetchSignInMethodsForEmail(auth, googleEmail);
-            console.log("Available sign-in methods:", signInMethods);
-            
-            // If password method exists, the accounts are separate but data is now synced
-            // User can sign in with either method and access the same data
-            if (signInMethods.includes('password')) {
-              console.log("Email/password account exists. Data has been synced. User can sign in with either method.");
-            }
-          } catch (checkError) {
-            console.log("Could not check sign-in methods:", checkError);
-          }
-        } else if (existingUserData && existingUserData.uid === googleUid) {
-          // Same UID, data already exists - just ensure it's up to date
-          console.log("User data already exists for Google account UID");
+        if (!googleCredentialToLink) {
+          // Fallback: get ID token to create credential
+          const googleIdToken = await googleUser.getIdToken();
+          googleCredentialToLink = GoogleAuthProvider.credential(googleIdToken);
         }
+        
+        // Create result object similar to handleGoogleSignup
+        const userExists = await checkUserExists(googleUser.uid);
+        let isAccountComplete = false;
+        if (userExists) {
+          isAccountComplete = await checkAccountComplete(googleUser.uid);
+        }
+        
+        result = {
+          user: googleUser,
+          isNewUser: !userExists,
+          userExists: userExists,
+          isAccountComplete: isAccountComplete
+        };
+      } catch (googleError) {
+        console.error("Error during Google sign-in:", googleError);
+        setError(googleError.message || "Failed to sign in with Google");
+        return;
+      }
+      
+      // Step 2: Check if email/password account exists with this email
+      try {
+        const signInMethods = await fetchSignInMethodsForEmail(auth, googleEmail);
+        console.log("Available sign-in methods for email:", signInMethods);
+        
+        // Check if email/password account exists separately
+        if (signInMethods.includes('password')) {
+          // Email/password account exists - we need to link Google to it
+          console.log("Email/password account exists. Linking Google credential to email/password account...");
+          
+          // Get user data from Firestore to get the password
+          const existingUserData = await getUserDataByEmail(googleEmail);
+          
+          if (existingUserData && existingUserData.Password && existingUserData.Password !== "String") {
+            const storedPassword = existingUserData.Password;
+            const emailPasswordUid = existingUserData.uid;
+            
+            // If UIDs are different, we need to link them
+            if (emailPasswordUid !== googleUid) {
+              console.log("Different UIDs detected. Linking Google to email/password account...");
+              console.log("Email/password UID:", emailPasswordUid, "Google UID:", googleUid);
+              
+              // Use the saved Google credential to link
+              // Sign out from Google account first
+              await signOut(auth);
+              
+              // Sign in with email/password to get the email/password account (primary account)
+              try {
+                const emailPasswordCredential = await signInWithEmailAndPassword(auth, googleEmail, storedPassword);
+                const emailPasswordUser = emailPasswordCredential.user;
+                console.log("Signed in with email/password account. UID:", emailPasswordUser.uid);
+                
+                // Now link Google credential to the email/password account
+                try {
+                  // Use the saved Google credential or create from ID token
+                  let credentialToUse = googleCredentialToLink;
+                  if (!credentialToUse) {
+                    // Fallback: get ID token from the original Google user
+                    const googleIdToken = await googleUser.getIdToken();
+                    credentialToUse = GoogleAuthProvider.credential(googleIdToken);
+                  }
+                  
+                  // Link Google credential to the email/password account
+                  await linkWithCredential(emailPasswordUser, credentialToUse);
+                  console.log("Google credential linked successfully to email/password account");
+                  
+                  // Verify both providers are now linked
+                  const updatedProviders = auth.currentUser.providerData.map(p => p.providerId);
+                  console.log("Linked providers:", updatedProviders);
+                  
+                  // Update result to use the email/password account (now with Google linked)
+                  result.user = auth.currentUser;
+                  
+                } catch (linkError) {
+                  console.error("Error linking Google credential:", linkError);
+                  console.error("Link error code:", linkError.code);
+                  
+                  // If linking fails, the account might already be linked or credential invalid
+                  // Sign back in with email/password (primary account)
+                  await signOut(auth);
+                  await signInWithEmailAndPassword(auth, googleEmail, storedPassword);
+                  result.user = auth.currentUser;
+                  
+                  // Check if providers are linked
+                  const providers = result.user.providerData.map(p => p.providerId);
+                  if (providers.includes('password') && providers.includes('google.com')) {
+                    console.log("Accounts are already linked");
+                  } else {
+                    console.log("Could not link accounts. User can still use email/password login.");
+                  }
+                }
+              } catch (emailPasswordError) {
+                console.error("Error signing in with email/password:", emailPasswordError);
+                // If we can't sign in with stored password, sign back in with Google
+                await signOut(auth);
+                const googleSignIn = await signInWithPopup(auth, googleProvider);
+                result.user = googleSignIn.user;
+                
+                // Sync data to Google account
+                const dataToCopy = {
+                  Username: existingUserData.Username,
+                  Number: existingUserData.Number,
+                  Password: existingUserData.Password,
+                  UserType: existingUserData.UserType,
+                  Email: existingUserData.Email || googleEmail,
+                  googleAcc: googleEmail
+                };
+                if (existingUserData.ProfilePicture) {
+                  dataToCopy.ProfilePicture = existingUserData.ProfilePicture;
+                }
+                await setDoc(doc(db, "Resergodb", googleSignIn.user.uid), dataToCopy, { merge: true });
+                console.log("Data synced to Google account");
+              }
+            } else {
+              // Same UID, check if password is already linked
+              const providers = googleUser.providerData.map(p => p.providerId);
+              if (!providers.includes('password')) {
+                // Google account exists but password not linked - try to link
+                console.log("Attempting to link password to Google account...");
+                try {
+                  const emailCredential = EmailAuthProvider.credential(googleEmail, storedPassword);
+                  await linkWithCredential(googleUser, emailCredential);
+                  console.log("Password credential linked to Google account");
+                } catch (linkError) {
+                  console.log("Could not link password:", linkError);
+                }
+              } else {
+                console.log("Password is already linked to Google account");
+              }
+            }
+          }
+        } else {
+          // No email/password account exists - check if we need to sync data
+          const existingUserData = await getUserDataByEmail(googleEmail);
+          if (existingUserData && existingUserData.uid !== googleUid) {
+            // Copy data to Google account
+            const dataToCopy = {
+              Username: existingUserData.Username,
+              Number: existingUserData.Number,
+              Password: existingUserData.Password,
+              UserType: existingUserData.UserType,
+              Email: existingUserData.Email || googleEmail,
+              googleAcc: googleEmail
+            };
+            if (existingUserData.ProfilePicture) {
+              dataToCopy.ProfilePicture = existingUserData.ProfilePicture;
+            }
+            await setDoc(doc(db, "Resergodb", googleUid), dataToCopy, { merge: true });
+            console.log("User data synced to Google account");
+          }
+        }
+      } catch (checkError) {
+        console.log("Could not check sign-in methods:", checkError);
       }
       
       if (result && result.isNewUser) {
