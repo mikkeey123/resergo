@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import Selection from "../components/Selection";
 import Body from "../components/Body";
 import ListingDetail from "./ListingDetail";
@@ -9,6 +10,8 @@ import Bookings from "./Bookings";
 import { getListing } from "../../Config";
 
 const Guestpage = ({ currentView = "listings", onBackToListings, onNavigateToMessages, searchFilters = {}, onSearchFilters }) => {
+    const { id } = useParams(); // Get listing ID from route
+    const navigate = useNavigate();
     const [activeSelection, setActiveSelection] = useState("Home");
     const [selectedListing, setSelectedListing] = useState(null);
     const [showMessagesModal, setShowMessagesModal] = useState(false);
@@ -22,10 +25,9 @@ const Guestpage = ({ currentView = "listings", onBackToListings, onNavigateToMes
         return () => window.removeEventListener('openMessagesModal', handleOpenModal);
     }, []);
 
-    // Check for listingId in URL query parameters
+    // Check for listingId in route parameters or query parameters (for backward compatibility)
     useEffect(() => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const listingId = urlParams.get('listingId');
+        const listingId = id || new URLSearchParams(window.location.search).get('listingId');
         
         if (listingId && !selectedListing) {
             // Load listing from ID
@@ -37,8 +39,10 @@ const Guestpage = ({ currentView = "listings", onBackToListings, onNavigateToMes
                             id: listingId,
                             fullListing: listingData
                         });
-                        // Remove query parameter from URL without reload
-                        window.history.replaceState({}, '', window.location.pathname);
+                        // Update URL to use route if it was from query parameter
+                        if (!id && listingId) {
+                            navigate(`/listing/${listingId}`, { replace: true });
+                        }
                     }
                 } catch (error) {
                     console.error("Error loading listing from URL:", error);
@@ -46,19 +50,25 @@ const Guestpage = ({ currentView = "listings", onBackToListings, onNavigateToMes
             };
             loadListingFromId();
         }
-    }, [selectedListing]);
+    }, [id, selectedListing, navigate]);
 
     // Handler for when a listing is clicked - use useCallback to stabilize reference
     const handleListingClick = useCallback((listing) => {
         console.log("Listing clicked in Guestpage:", listing);
-        setSelectedListing(listing);
-    }, []);
+        const listingId = listing?.id || listing?.fullListing?.id;
+        if (listingId) {
+            navigate(`/listing/${listingId}`);
+        } else {
+            setSelectedListing(listing);
+        }
+    }, [navigate]);
 
     // Handler for when back is clicked
     const handleBack = useCallback(() => {
         console.log("Back button clicked");
         setSelectedListing(null);
-    }, []);
+        navigate('/guest');
+    }, [navigate]);
 
     // Handler for navigating to messages - opens modal
     const handleNavigateToMessages = useCallback(() => {

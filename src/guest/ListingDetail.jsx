@@ -895,9 +895,9 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
                   alert("Unable to generate share link. Listing ID not found.");
                   return;
                 }
-                // Create shareable URL - use the base URL with listingId query parameter
+                // Create shareable URL using React Router route
                 const baseUrl = window.location.origin;
-                const listingUrl = `${baseUrl}/guest?listingId=${listingId}`;
+                const listingUrl = `${baseUrl}/listing/${listingId}`;
                 
                 // Use React DOM ref to copy link
                 if (copyInputRef.current) {

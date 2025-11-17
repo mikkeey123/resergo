@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'  
+import { BrowserRouter, Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 // import resergo from '/resergo.svg'
 import Navbar from './components/Navbar.jsx'
 import LandingPage from './components/LandingPage.jsx';
@@ -11,110 +12,134 @@ import Loginmodal from './auth/Loginmodal';
 import UserSignup from './auth/UserSignup';
 import FloatingMessageButton from './components/FloatingMessageButton.jsx';
 import { auth, checkAccountComplete, getUserType } from '../Config';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import './App.css'
 
-function App() {
-  const [currentPage, setCurrentPage] = useState("home"); // 'home', 'guest', 'host', 'admin', 'userDetails'
-  const [previousPage, setPreviousPage] = useState("home"); // Track previous page for back navigation
-  const [showGoogleSignupModal, setShowGoogleSignupModal] = useState(false); // Modal for new Google users
-  const [pendingGoogleUser, setPendingGoogleUser] = useState(null); // Store user info (uid, email) for signup modal
-  const [signupModalLoginType, setSignupModalLoginType] = useState("guest"); // Track loginType for signup modal
-  const [guestView, setGuestView] = useState("listings"); // 'listings', 'favorites', or 'messages' for guest page
-  const [searchFilters, setSearchFilters] = useState({}); // Search filters for guest listings
+// Protected Route Component
+const ProtectedRoute = ({ children, requiredUserType = null }) => {
+  const [loading, setLoading] = useState(true);
+  const [authorized, setAuthorized] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // Check if signed-in user has completed account setup and verify user type
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setLoading(false);
+        setAuthorized(false);
+        navigate('/');
+        return;
+      }
+
       try {
-        if (user && (currentPage === "guest" || currentPage === "host" || currentPage === "admin")) {
-          // Check if account is complete
-          try {
-            const isComplete = await checkAccountComplete(user.uid);
-            if (!isComplete) {
-              // Account not complete - keep authenticated and show signup modal
-              console.log("Account incomplete, showing signup modal (keeping authenticated)");
-              setCurrentPage("home");
-              // Store user info for the modal
-              setPendingGoogleUser({
-                uid: user.uid,
-                email: user.email
-              });
-              setSignupModalLoginType(currentPage === "host" ? "host" : "guest");
-              setShowGoogleSignupModal(true);
-            } else {
-              // Check user type - prevent unauthorized access
-              try {
-                const userType = await getUserType(user.uid);
-                if (currentPage === "host" && userType !== "host" && userType !== "admin") {
-                  console.log("Non-host user trying to access host page, redirecting to guest page");
-                  setCurrentPage("guest");
-                } else if (currentPage === "guest" && userType === "admin") {
-                  // Admin can access guest page, but we might want to redirect to admin
-                  console.log("Admin user on guest page");
-                } else if (currentPage === "admin" && userType !== "admin") {
-                  console.log("Non-admin user trying to access admin page, redirecting");
-                  setCurrentPage(userType === "host" ? "host" : "guest");
-                }
-              } catch (error) {
-                console.error("Error checking user type:", error);
-                // Don't block navigation on error, just log it
-              }
-            }
-          } catch (error) {
-            console.error("Error checking account completion:", error);
-            // Don't block the app if there's an error checking account
+        const isComplete = await checkAccountComplete(user.uid);
+        if (!isComplete) {
+          setLoading(false);
+          setAuthorized(false);
+          navigate('/');
+          return;
+        }
+
+        if (requiredUserType) {
+          const userType = await getUserType(user.uid);
+          if (requiredUserType === 'host' && userType !== 'host' && userType !== 'admin') {
+            setLoading(false);
+            setAuthorized(false);
+            navigate('/guest');
+            return;
+          } else if (requiredUserType === 'admin' && userType !== 'admin') {
+            setLoading(false);
+            setAuthorized(false);
+            navigate(userType === 'host' ? '/host' : '/guest');
+            return;
           }
         }
+
+        setLoading(false);
+        setAuthorized(true);
       } catch (error) {
-        console.error("Error in auth state change handler:", error);
-        // Ensure the app still renders even if there's an error
+        console.error("Error checking authorization:", error);
+        setLoading(false);
+        setAuthorized(false);
+        navigate('/');
       }
     });
 
     return () => unsubscribe();
-  }, [currentPage]);
+  }, [navigate, requiredUserType]);
 
-  console.log("App component rendering, currentPage:", currentPage);
-  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Loading...</div>
+      </div>
+    );
+  }
+
+  return authorized ? children : null;
+};
+
+// App Content Component (uses hooks that need to be inside Router)
+const AppContent = () => {
+  const [showGoogleSignupModal, setShowGoogleSignupModal] = useState(false);
+  const [pendingGoogleUser, setPendingGoogleUser] = useState(null);
+  const [signupModalLoginType, setSignupModalLoginType] = useState("guest");
+  const [searchFilters, setSearchFilters] = useState({});
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Check if signed-in user has completed account setup
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user && (location.pathname.startsWith('/guest') || location.pathname.startsWith('/host') || location.pathname.startsWith('/admin'))) {
+        try {
+          const isComplete = await checkAccountComplete(user.uid);
+          if (!isComplete) {
+            setPendingGoogleUser({
+              uid: user.uid,
+              email: user.email
+            });
+            setSignupModalLoginType(location.pathname.startsWith('/host') ? 'host' : 'guest');
+            setShowGoogleSignupModal(true);
+            navigate('/');
+          }
+        } catch (error) {
+          console.error("Error checking account completion:", error);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [location.pathname, navigate]);
+
+  const currentPage = location.pathname === '/' ? 'home' : 
+                     location.pathname.startsWith('/guest') ? 'guest' :
+                     location.pathname.startsWith('/host') ? 'host' :
+                     location.pathname.startsWith('/admin') ? 'admin' : 'home';
+
   return (
     <div className="min-h-screen">
       {currentPage !== "host" && currentPage !== "admin" && (
         <Navbar 
           currentPage={currentPage}
           onNavigateToUserDetails={() => {
-            // Store current page before navigating to UserDetails
-            // Only allow navigation from guest, host, or admin pages
             if (currentPage === "guest" || currentPage === "host" || currentPage === "admin") {
-              console.log("Navigating to UserDetails from:", currentPage);
-              setPreviousPage(currentPage);
-              setCurrentPage("userDetails");
-            } else {
-              console.warn("Cannot navigate to UserDetails from:", currentPage);
+              navigate('/user-details');
             }
           }}
           onNavigateToGuest={() => {
-            console.log("Navigating to guest page");
-            setCurrentPage("guest");
-            setGuestView("listings");
+            navigate('/guest');
           }}
           onNavigateToFavorites={() => {
-            console.log("Navigating to favorites page");
-            setCurrentPage("guest");
-            setGuestView("favorites");
+            navigate('/guest/favorites');
           }}
           onNavigateToPayments={() => {
-            console.log("Navigating to payments page");
-            setCurrentPage("guest");
-            setGuestView("payments");
+            navigate('/guest/payments');
           }}
           onNavigateToBookings={() => {
-            console.log("Navigating to bookings page");
-            setCurrentPage("guest");
-            setGuestView("bookings");
+            navigate('/guest/bookings');
           }}
           onNavigateToMessages={() => {
-            // Just dispatch the event to open the modal - no navigation
             window.dispatchEvent(new CustomEvent('openMessagesModal'));
           }}
           onSearchFilters={(filters) => {
@@ -122,11 +147,10 @@ function App() {
           }}
           searchFilters={searchFilters}
           onNavigateToHost={() => {
-            console.log("Navigating to host page");
-            setCurrentPage("host");
+            navigate('/host');
           }}
           onNavigateToHome={() => {
-            setCurrentPage("home");
+            navigate('/');
             setShowGoogleSignupModal(false);
           }}
           onShowGoogleSignupModal={(userInfo, loginType = "guest") => {
@@ -140,85 +164,153 @@ function App() {
       )}
       
       <main>
-        {currentPage === "userDetails" ? (
-          <UserDetails onBack={async () => {
-            console.log("Back button clicked, previousPage:", previousPage);
-            
-            // If previousPage is a valid page (guest, host, or admin), use it
-            if (previousPage === "guest" || previousPage === "host" || previousPage === "admin") {
-              setCurrentPage(previousPage);
-            } else {
-              // Otherwise, determine based on user type
-              try {
-                const user = auth.currentUser;
-                if (user) {
-                  const userType = await getUserType(user.uid);
-                  if (userType === "admin") {
-                    console.log("User is an admin, navigating to admin page");
-                    setCurrentPage("admin");
-                  } else if (userType === "host") {
-                    console.log("User is a host, navigating to host page");
-                    setCurrentPage("host");
-                  } else {
-                    console.log("User is a guest, navigating to guest page");
-                    setCurrentPage("guest");
+        <Routes>
+          {/* Home/Landing Page */}
+          <Route 
+            path="/" 
+            element={
+              <LandingPage
+                onNavigateToGuest={() => navigate('/guest')}
+                onNavigateToHost={() => navigate('/host')}
+                onNavigateToAdmin={() => navigate('/admin')}
+                onShowGoogleSignupModal={(userInfo, loginType = "guest") => {
+                  if (userInfo) {
+                    setPendingGoogleUser(userInfo);
+                    setSignupModalLoginType(loginType);
                   }
-                } else {
-                  // No user logged in, default to guest
-                  console.log("No user logged in, defaulting to guest page");
-                  setCurrentPage("guest");
-                }
-              } catch (error) {
-                console.error("Error getting user type, defaulting to guest:", error);
-                setCurrentPage("guest");
-              }
-            }
-          }} />
-        ) : currentPage === "guest" ? (
-          <Guestpage 
-            currentView={guestView} 
-            onBackToListings={() => {
-              setGuestView("listings");
-            }}
-            onNavigateToMessages={() => {
-              // Don't change view, let Guestpage handle modal state
-            }}
-            searchFilters={searchFilters}
-            onSearchFilters={(filters) => {
-              setSearchFilters(filters);
-            }}
+                  setShowGoogleSignupModal(true);
+                }}
+              />
+            } 
           />
-        ) : currentPage === "host" ? (
-          <Hostpage />
-        ) : currentPage === "admin" ? (
-          <Adminpage />
-        ) : (
-          <LandingPage
-            onNavigateToGuest={() => {
-              console.log("Navigating to guest page");
-              setCurrentPage("guest");
-            }}
-            onNavigateToHost={() => {
-              console.log("Navigating to host page");
-              setCurrentPage("host");
-            }}
-            onNavigateToAdmin={() => {
-              console.log("Navigating to admin page");
-              setCurrentPage("admin");
-            }}
-            onShowGoogleSignupModal={(userInfo, loginType = "guest") => {
-              if (userInfo) {
-                setPendingGoogleUser(userInfo);
-                setSignupModalLoginType(loginType);
-              }
-              setShowGoogleSignupModal(true);
-            }}
+
+          {/* Guest Routes */}
+          <Route 
+            path="/guest" 
+            element={
+              <ProtectedRoute>
+                <Guestpage 
+                  currentView="listings"
+                  onBackToListings={() => navigate('/guest')}
+                  onNavigateToMessages={() => {}}
+                  searchFilters={searchFilters}
+                  onSearchFilters={(filters) => setSearchFilters(filters)}
+                />
+              </ProtectedRoute>
+            } 
           />
-        )}
+          <Route 
+            path="/guest/favorites" 
+            element={
+              <ProtectedRoute>
+                <Guestpage 
+                  currentView="favorites"
+                  onBackToListings={() => navigate('/guest')}
+                  onNavigateToMessages={() => {}}
+                  searchFilters={searchFilters}
+                  onSearchFilters={(filters) => setSearchFilters(filters)}
+                />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/guest/payments" 
+            element={
+              <ProtectedRoute>
+                <Guestpage 
+                  currentView="payments"
+                  onBackToListings={() => navigate('/guest')}
+                  onNavigateToMessages={() => {}}
+                  searchFilters={searchFilters}
+                  onSearchFilters={(filters) => setSearchFilters(filters)}
+                />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/guest/bookings" 
+            element={
+              <ProtectedRoute>
+                <Guestpage 
+                  currentView="bookings"
+                  onBackToListings={() => navigate('/guest')}
+                  onNavigateToMessages={() => {}}
+                  searchFilters={searchFilters}
+                  onSearchFilters={(filters) => setSearchFilters(filters)}
+                />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/listing/:id" 
+            element={
+              <ProtectedRoute>
+                <Guestpage 
+                  currentView="listings"
+                  onBackToListings={() => navigate('/guest')}
+                  onNavigateToMessages={() => {}}
+                  searchFilters={searchFilters}
+                  onSearchFilters={(filters) => setSearchFilters(filters)}
+                />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Host Route */}
+          <Route 
+            path="/host/*" 
+            element={
+              <ProtectedRoute requiredUserType="host">
+                <Hostpage />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* Admin Route */}
+          <Route 
+            path="/admin/*" 
+            element={
+              <ProtectedRoute requiredUserType="admin">
+                <Adminpage />
+              </ProtectedRoute>
+            } 
+          />
+
+          {/* User Details Route */}
+          <Route 
+            path="/user-details" 
+            element={
+              <ProtectedRoute>
+                <UserDetails 
+                  onBack={async () => {
+                    try {
+                      const user = auth.currentUser;
+                      if (user) {
+                        const userType = await getUserType(user.uid);
+                        if (userType === "admin") {
+                          navigate('/admin');
+                        } else if (userType === "host") {
+                          navigate('/host');
+                        } else {
+                          navigate('/guest');
+                        }
+                      } else {
+                        navigate('/guest');
+                      }
+                    } catch (error) {
+                      console.error("Error getting user type, defaulting to guest:", error);
+                      navigate('/guest');
+                    }
+                  }} 
+                />
+              </ProtectedRoute>
+            } 
+          />
+        </Routes>
       </main>
       
-      {/* Floating Message Button - Show only on guest page */}
-      {currentPage === "guest" && (
+      {/* Floating Message Button - Show only on guest pages */}
+      {location.pathname.startsWith('/guest') && (
         <FloatingMessageButton />
       )}
       
@@ -238,12 +330,12 @@ function App() {
           onNavigateToGuest={() => {
             setShowGoogleSignupModal(false);
             setPendingGoogleUser(null);
-            setCurrentPage("guest");
+            navigate('/guest');
           }}
           onNavigateToHost={() => {
             setShowGoogleSignupModal(false);
             setPendingGoogleUser(null);
-            setCurrentPage("host");
+            navigate('/host');
           }}
           isGoogleSignup={true}
           pendingUser={pendingGoogleUser}
@@ -253,5 +345,14 @@ function App() {
       {currentPage !== "host" && currentPage !== "admin" && <Lpfooter />}
     </div>
   );
+};
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
+    </BrowserRouter>
+  );
 }
+
 export default App
