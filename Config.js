@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, EmailAuthProvider, linkWithCredential, signOut, signInWithCredential } from "firebase/auth";
+import { getAuth, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, EmailAuthProvider, linkWithCredential, signOut, signInWithCredential, fetchSignInMethodsForEmail } from "firebase/auth";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, serverTimestamp, Timestamp, query, where, getDocs, orderBy } from "firebase/firestore";
 import { sendWelcomeEmail, sendBookingApprovalEmail, sendBookingRejectionEmail } from "./src/utils/emailService.js";
 

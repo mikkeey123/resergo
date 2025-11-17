@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { handleGoogleSignup, auth, getUserType, updateUserType, saveGoogleUserData } from "../../Config";
-import { signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
+import { signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, fetchSignInMethodsForEmail } from "firebase/auth";
 import AlertPopup from "../components/AlertPopup";
 
 const LoginForm = ({ title = "Login", loginType = "guest", onNavigateToGuest, onNavigateToHost, onNavigateToAdmin, onNavigateToHome, onClose, onGoogleSignIn, showSignup = false, onSwitchToSignup }) => {
@@ -125,9 +125,29 @@ const LoginForm = ({ title = "Login", loginType = "guest", onNavigateToGuest, on
       }
     } catch (err) {
       console.error("Login error:", err);
+      console.error("Error code:", err.code);
+      console.error("Error message:", err.message);
+      
       // Handle specific error codes
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
-        setError("Invalid email or password. Please check your credentials and try again.");
+        // Check if the email exists and what sign-in methods are available
+        try {
+          const signInMethods = await fetchSignInMethodsForEmail(auth, email);
+          console.log("Available sign-in methods for this email:", signInMethods);
+          
+          if (signInMethods.length === 0) {
+            setError("No account found with this email. Please sign up first.");
+          } else if (signInMethods.includes('google.com') && !signInMethods.includes('password')) {
+            setError("This account was created with Google. Please sign in with Google instead, or use the same email to create a password account.");
+          } else if (!signInMethods.includes('password')) {
+            setError("This account doesn't have a password set. Please sign in with Google or reset your password.");
+          } else {
+            setError("Invalid email or password. Please check your credentials and try again.");
+          }
+        } catch (checkError) {
+          console.error("Error checking sign-in methods:", checkError);
+          setError("Invalid email or password. Please check your credentials and try again.");
+        }
       } else if (err.code === 'auth/invalid-email') {
         setError("Invalid email address. Please check your email and try again.");
       } else if (err.code === 'auth/too-many-requests') {
