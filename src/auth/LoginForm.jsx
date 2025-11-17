@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import UserSignup from "./UserSignup";
 import { handleGoogleSignup, auth, getUserType, updateUserType, saveGoogleUserData } from "../../Config";
 import { signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword } from "firebase/auth";
 import AlertPopup from "../components/AlertPopup";
@@ -39,21 +38,6 @@ const LoginForm = ({ title = "Login", loginType = "guest", onNavigateToGuest, on
   useEffect(() => {
     setIsSignup(showSignup);
   }, [showSignup]);
-
-  // If showing signup, render UserSignup
-  if (isSignup) {
-    return (
-      <UserSignup
-        title="Sign Up"
-        loginType={loginType}
-        onNavigateToGuest={onNavigateToGuest}
-        onNavigateToHost={onNavigateToHost}
-        onClose={onClose}
-        onSwitchToLogin={() => setIsSignup(false)}
-        onGoogleSignIn={onGoogleSignIn}
-      />
-    );
-  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
