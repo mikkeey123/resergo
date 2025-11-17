@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { 
   FaWifi, 
   FaLock, 
@@ -897,13 +897,65 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
                 // Create shareable URL - use the base URL with listingId query parameter
                 const baseUrl = window.location.origin;
                 const listingUrl = `${baseUrl}/guest?listingId=${listingId}`;
-                navigator.clipboard.writeText(listingUrl).then(() => {
-                  setShareCopied(true);
-                  setTimeout(() => setShareCopied(false), 2000);
-                }).catch((error) => {
-                  console.error("Failed to copy:", error);
-                  alert("Failed to copy link. Please try again.");
-                });
+                
+                // Use React DOM to copy link
+                const copyToClipboard = (text) => {
+                  // Create a temporary input element using React DOM
+                  const tempDiv = document.createElement('div');
+                  tempDiv.style.position = 'fixed';
+                  tempDiv.style.left = '-9999px';
+                  tempDiv.style.top = '-9999px';
+                  
+                  const tempInput = document.createElement('input');
+                  tempInput.value = text;
+                  tempInput.readOnly = true;
+                  tempDiv.appendChild(tempInput);
+                  document.body.appendChild(tempDiv);
+                  
+                  // Select and copy
+                  tempInput.select();
+                  tempInput.setSelectionRange(0, 99999); // For mobile devices
+                  
+                  try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                      setShareCopied(true);
+                      setTimeout(() => setShareCopied(false), 2000);
+                    } else {
+                      // Fallback to clipboard API
+                      if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(text).then(() => {
+                          setShareCopied(true);
+                          setTimeout(() => setShareCopied(false), 2000);
+                        }).catch((error) => {
+                          console.error("Failed to copy:", error);
+                          alert("Failed to copy link. Please try again.");
+                        });
+                      } else {
+                        alert("Failed to copy link. Please try again.");
+                      }
+                    }
+                  } catch (err) {
+                    console.error("Failed to copy:", err);
+                    // Fallback to clipboard API
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                      navigator.clipboard.writeText(text).then(() => {
+                        setShareCopied(true);
+                        setTimeout(() => setShareCopied(false), 2000);
+                      }).catch((error) => {
+                        console.error("Failed to copy:", error);
+                        alert("Failed to copy link. Please try again.");
+                      });
+                    } else {
+                      alert("Failed to copy link. Please try again.");
+                    }
+                  } finally {
+                    // Clean up
+                    document.body.removeChild(tempDiv);
+                  }
+                };
+                
+                copyToClipboard(listingUrl);
               }}
               className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors bg-white"
               title="Copy listing link"

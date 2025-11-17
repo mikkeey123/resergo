@@ -203,13 +203,64 @@ const Coupons = () => {
     };
 
     const handleCopyCode = (couponCode) => {
-        navigator.clipboard.writeText(couponCode).then(() => {
-            setCopiedCode(couponCode);
-            setTimeout(() => setCopiedCode(null), 2000);
-        }).catch((error) => {
-            console.error("Failed to copy:", error);
-            alert("Failed to copy coupon code");
-        });
+        // Use React DOM to copy code
+        const copyToClipboard = (text) => {
+            // Create a temporary input element using React DOM
+            const tempDiv = document.createElement('div');
+            tempDiv.style.position = 'fixed';
+            tempDiv.style.left = '-9999px';
+            tempDiv.style.top = '-9999px';
+            
+            const tempInput = document.createElement('input');
+            tempInput.value = text;
+            tempInput.readOnly = true;
+            tempDiv.appendChild(tempInput);
+            document.body.appendChild(tempDiv);
+            
+            // Select and copy
+            tempInput.select();
+            tempInput.setSelectionRange(0, 99999); // For mobile devices
+            
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    setCopiedCode(couponCode);
+                    setTimeout(() => setCopiedCode(null), 2000);
+                } else {
+                    // Fallback to clipboard API
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(text).then(() => {
+                            setCopiedCode(couponCode);
+                            setTimeout(() => setCopiedCode(null), 2000);
+                        }).catch((error) => {
+                            console.error("Failed to copy:", error);
+                            alert("Failed to copy coupon code");
+                        });
+                    } else {
+                        alert("Failed to copy coupon code");
+                    }
+                }
+            } catch (err) {
+                console.error("Failed to copy:", err);
+                // Fallback to clipboard API
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        setCopiedCode(couponCode);
+                        setTimeout(() => setCopiedCode(null), 2000);
+                    }).catch((error) => {
+                        console.error("Failed to copy:", error);
+                        alert("Failed to copy coupon code");
+                    });
+                } else {
+                    alert("Failed to copy coupon code");
+                }
+            } finally {
+                // Clean up
+                document.body.removeChild(tempDiv);
+            }
+        };
+        
+        copyToClipboard(couponCode);
     };
 
     const handleOpenSendModal = (coupon) => {
