@@ -6,6 +6,7 @@ import Favorites from "./Favorites";
 import MessagesPage from "./MessagesPage";
 import Payments from "./Payments";
 import Bookings from "./Bookings";
+import { getListing } from "../../Config";
 
 const Guestpage = ({ currentView = "listings", onBackToListings, onNavigateToMessages, searchFilters = {}, onSearchFilters }) => {
     const [activeSelection, setActiveSelection] = useState("Home");
@@ -20,6 +21,32 @@ const Guestpage = ({ currentView = "listings", onBackToListings, onNavigateToMes
         window.addEventListener('openMessagesModal', handleOpenModal);
         return () => window.removeEventListener('openMessagesModal', handleOpenModal);
     }, []);
+
+    // Check for listingId in URL query parameters
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const listingId = urlParams.get('listingId');
+        
+        if (listingId && !selectedListing) {
+            // Load listing from ID
+            const loadListingFromId = async () => {
+                try {
+                    const listingData = await getListing(listingId);
+                    if (listingData) {
+                        setSelectedListing({
+                            id: listingId,
+                            fullListing: listingData
+                        });
+                        // Remove query parameter from URL without reload
+                        window.history.replaceState({}, '', window.location.pathname);
+                    }
+                } catch (error) {
+                    console.error("Error loading listing from URL:", error);
+                }
+            };
+            loadListingFromId();
+        }
+    }, [selectedListing]);
 
     // Handler for when a listing is clicked - use useCallback to stabilize reference
     const handleListingClick = useCallback((listing) => {

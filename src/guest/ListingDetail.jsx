@@ -54,8 +54,9 @@ import {
   FaChevronRight,
   FaTimes
 } from "react-icons/fa";
-import { getListing, getUserData, saveReview, getListingReviews, updateReview, updateListingRating, auth, db, validateCoupon, createBooking } from "../../Config";
+import { getListing, getUserData, saveReview, getListingReviews, updateReview, updateListingRating, auth, db, validateCoupon, createBooking, addFavorite, removeFavorite, isFavorite } from "../../Config";
 import { doc, deleteDoc } from "firebase/firestore";
+import { onAuthStateChanged } from "firebase/auth";
 import ListingMap from "./components/ListingMap";
 
 const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
@@ -98,6 +99,9 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
   const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [isFavoriteListing, setIsFavoriteListing] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
+  const [userId, setUserId] = useState(null);
   const [bookingError, setBookingError] = useState("");
   const [bookingSuccess, setBookingSuccess] = useState("");
   
@@ -197,6 +201,59 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
       setModalPhotoIndex(selectedPhotoIndex);
     }
   }, [showAllPhotos, selectedPhotoIndex]);
+
+  // Load user authentication state and favorite status
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setUserId(user.uid);
+        // Check if listing is favorited
+        const listingId = fullListingData?.id || listing?.id;
+        if (listingId) {
+          try {
+            const favorited = await isFavorite(user.uid, listingId);
+            setIsFavoriteListing(favorited);
+          } catch (error) {
+            console.error("Error checking favorite status:", error);
+          }
+        }
+      } else {
+        setUserId(null);
+        setIsFavoriteListing(false);
+      }
+    });
+    return () => unsubscribe();
+  }, [fullListingData, listing]);
+
+  // Toggle favorite status
+  const handleToggleFavorite = async () => {
+    if (!userId) {
+      alert("Please log in to save listings to your favorites.");
+      return;
+    }
+
+    const listingId = fullListingData?.id || listing?.id;
+    if (!listingId) {
+      console.error("Cannot toggle favorite: Listing ID not found");
+      return;
+    }
+
+    setFavoriteLoading(true);
+    try {
+      if (isFavoriteListing) {
+        await removeFavorite(userId, listingId);
+        setIsFavoriteListing(false);
+      } else {
+        await addFavorite(userId, listingId);
+        setIsFavoriteListing(true);
+      }
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+      alert("Failed to update favorite. Please try again.");
+    } finally {
+      setFavoriteLoading(false);
+    }
+  };
   
   // Fetch full listing data and host information
   useEffect(() => {
@@ -837,7 +894,9 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
                   alert("Unable to generate share link. Listing ID not found.");
                   return;
                 }
-                const listingUrl = `${window.location.origin}${window.location.pathname}?listingId=${listingId}`;
+                // Create shareable URL - use the base URL with listingId query parameter
+                const baseUrl = window.location.origin;
+                const listingUrl = `${baseUrl}/guest?listingId=${listingId}`;
                 navigator.clipboard.writeText(listingUrl).then(() => {
                   setShareCopied(true);
                   setTimeout(() => setShareCopied(false), 2000);
@@ -858,9 +917,18 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
                 {shareCopied ? "Copied!" : "Share"}
               </span>
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors bg-white">
-              <FaHeart className="text-gray-700" />
-              <span className="text-sm font-medium text-gray-700">Save</span>
+            <button 
+              onClick={handleToggleFavorite}
+              disabled={favoriteLoading}
+              className={`flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors bg-white ${
+                isFavoriteListing ? 'border-red-300 bg-red-50' : ''
+              } ${favoriteLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              title={isFavoriteListing ? "Remove from favorites" : "Save to favorites"}
+            >
+              <FaHeart className={isFavoriteListing ? "text-red-600" : "text-gray-700"} />
+              <span className={`text-sm font-medium ${isFavoriteListing ? 'text-red-600' : 'text-gray-700'}`}>
+                {favoriteLoading ? "Saving..." : isFavoriteListing ? "Saved" : "Save"}
+              </span>
             </button>
           </div>
         </div>
