@@ -229,27 +229,66 @@ const UserSignup = ({ title = "Sign Up", loginType = "guest", onNavigateToGuest,
         return;
       }
       
-      // Not a Google signup - just navigate
-      onClose();
-      setTimeout(() => {
-        if (loginType === "host") {
-          console.log("Navigating to host page after signup");
-          if (onNavigateToHost) {
-            onNavigateToHost();
-          } else {
-            console.error("onNavigateToHost is not defined");
-          }
+      // Not a Google signup - create email/password account
+      if (!email) {
+        setError("Email is required");
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // Step 1: Create email/password account
+        console.log("Creating email/password account with email:", email);
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        console.log("Email/password account created successfully with UID:", user.uid);
+
+        // Step 2: Save user data to Firestore
+        console.log("Saving user data to Firestore with UID:", user.uid, "Username:", username, "Phone:", number, "Email:", email, "UserType:", loginType);
+        await saveGoogleUserData(user.uid, username, number, password, loginType, email, profilePicture);
+        console.log("User data saved to Firestore successfully");
+
+        // Note: Welcome email is sent automatically in saveGoogleUserData function
+
+        setSuccess("Account created successfully! Welcome email sent.");
+        setLoading(false);
+
+        // Wait a bit to show success message before navigating
+        setTimeout(() => {
+          onClose();
+          setTimeout(() => {
+            if (loginType === "host") {
+              console.log("Navigating to host page after signup");
+              if (onNavigateToHost) {
+                onNavigateToHost();
+              } else {
+                console.error("onNavigateToHost is not defined");
+              }
+            } else {
+              console.log("Navigating to guest page after signup");
+              if (onNavigateToGuest) {
+                onNavigateToGuest();
+              } else {
+                console.error("onNavigateToGuest is not defined");
+              }
+            }
+          }, 100);
+        }, 1500);
+      } catch (createError) {
+        setLoading(false);
+        if (createError.code === 'auth/email-already-in-use') {
+          setError("An account with this email already exists. Please sign in instead.");
+        } else if (createError.code === 'auth/invalid-email') {
+          setError("Invalid email address. Please check your email and try again.");
+        } else if (createError.code === 'auth/weak-password') {
+          setError("Password is too weak. Please choose a stronger password (at least 6 characters).");
         } else {
-          console.log("Navigating to guest page after signup");
-          if (onNavigateToGuest) {
-            onNavigateToGuest();
-          } else {
-            console.error("onNavigateToGuest is not defined");
-          }
+          setError(createError.message || "Failed to create account. Please try again.");
         }
-      }, 100);
+      }
     } catch (err) {
-      console.error("Error saving user data:", err);
+      console.error("Error in handleSubmit:", err);
+      setLoading(false);
       // Customize error messages for better user experience
       if (err.code === 'auth/weak-password') {
         setError("Password is too weak. Please choose a stronger password.");
@@ -262,7 +301,6 @@ const UserSignup = ({ title = "Sign Up", loginType = "guest", onNavigateToGuest,
       } else {
         setError(err.message || "Failed to save user data. Please try again.");
       }
-      setLoading(false);
     }
   };
 

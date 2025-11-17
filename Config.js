@@ -99,7 +99,8 @@ const saveGoogleUserData = async (uid, username, phoneNumber, password, userType
             Number: phoneNumberNum,
             Password: password || "String", // Store password (in production, this should be hashed)
             UserType: userType,
-            googleAcc: userEmail
+            Email: userEmail, // Store email in dedicated field
+            googleAcc: userEmail // Also store in googleAcc for backward compatibility
         };
         
         // Add profile picture if provided
@@ -149,7 +150,8 @@ const saveAdminUserData = async (uid, username, phoneNumber, password, email = n
             Number: phoneNumberNum,
             Password: password || "String", // Store password (in production, this should be hashed)
             UserType: "admin",
-            googleAcc: userEmail
+            Email: userEmail, // Store email in dedicated field
+            googleAcc: userEmail // Also store in googleAcc for backward compatibility
         });
         console.log('Admin user data saved to Firestore with UID:', uid);
         return true;
@@ -172,7 +174,8 @@ const saveHostUserData = async (uid, username, phoneNumber, password, email = nu
             Number: phoneNumberNum,
             Password: password || "String", // Store password (in production, this should be hashed)
             UserType: "host",
-            googleAcc: userEmail
+            Email: userEmail, // Store email in dedicated field
+            googleAcc: userEmail // Also store in googleAcc for backward compatibility
         };
         
         // Add profile picture if provided
