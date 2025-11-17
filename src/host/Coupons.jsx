@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { FaPlus, FaEdit, FaTrash, FaTimes, FaCheckCircle, FaTimesCircle, FaCopy, FaPaperPlane, FaCheck } from "react-icons/fa";
 import { auth, getHostCoupons, createCoupon, updateCoupon, deleteCoupon, getConversations, sendMessage, getUserData } from "../../Config";
 import { onAuthStateChanged } from "firebase/auth";
@@ -26,6 +26,7 @@ const Coupons = () => {
     const [selectedGuestId, setSelectedGuestId] = useState("");
     const [sendingMessage, setSendingMessage] = useState(false);
     const [copiedCode, setCopiedCode] = useState(null);
+    const copyInputRef = useRef(null);
 
     // Get current user
     useEffect(() => {
@@ -202,65 +203,46 @@ const Coupons = () => {
         }
     };
 
-    const handleCopyCode = (couponCode) => {
-        // Use React DOM to copy code
-        const copyToClipboard = (text) => {
-            // Create a temporary input element using React DOM
-            const tempDiv = document.createElement('div');
-            tempDiv.style.position = 'fixed';
-            tempDiv.style.left = '-9999px';
-            tempDiv.style.top = '-9999px';
-            
-            const tempInput = document.createElement('input');
-            tempInput.value = text;
-            tempInput.readOnly = true;
-            tempDiv.appendChild(tempInput);
-            document.body.appendChild(tempDiv);
-            
-            // Select and copy
-            tempInput.select();
-            tempInput.setSelectionRange(0, 99999); // For mobile devices
+    const handleCopyCode = async (couponCode) => {
+        // Use React DOM ref to copy code
+        if (copyInputRef.current) {
+            copyInputRef.current.value = couponCode;
+            copyInputRef.current.select();
+            copyInputRef.current.setSelectionRange(0, 99999); // For mobile devices
             
             try {
-                const successful = document.execCommand('copy');
-                if (successful) {
+                // Try modern clipboard API first
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(couponCode);
                     setCopiedCode(couponCode);
                     setTimeout(() => setCopiedCode(null), 2000);
                 } else {
-                    // Fallback to clipboard API
-                    if (navigator.clipboard && navigator.clipboard.writeText) {
-                        navigator.clipboard.writeText(text).then(() => {
-                            setCopiedCode(couponCode);
-                            setTimeout(() => setCopiedCode(null), 2000);
-                        }).catch((error) => {
-                            console.error("Failed to copy:", error);
-                            alert("Failed to copy coupon code");
-                        });
+                    // Fallback to execCommand
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        setCopiedCode(couponCode);
+                        setTimeout(() => setCopiedCode(null), 2000);
                     } else {
                         alert("Failed to copy coupon code");
                     }
                 }
             } catch (err) {
                 console.error("Failed to copy:", err);
-                // Fallback to clipboard API
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(text).then(() => {
+                // Try execCommand as fallback
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
                         setCopiedCode(couponCode);
                         setTimeout(() => setCopiedCode(null), 2000);
-                    }).catch((error) => {
-                        console.error("Failed to copy:", error);
+                    } else {
                         alert("Failed to copy coupon code");
-                    });
-                } else {
+                    }
+                } catch (fallbackErr) {
+                    console.error("Fallback copy failed:", fallbackErr);
                     alert("Failed to copy coupon code");
                 }
-            } finally {
-                // Clean up
-                document.body.removeChild(tempDiv);
             }
-        };
-        
-        copyToClipboard(couponCode);
+        }
     };
 
     const handleOpenSendModal = (coupon) => {
@@ -688,6 +670,22 @@ const Coupons = () => {
                     </div>
                 </div>
             )}
+
+            {/* Hidden input for copying code using React DOM */}
+            <input
+                ref={copyInputRef}
+                type="text"
+                readOnly
+                style={{
+                    position: 'fixed',
+                    left: '-9999px',
+                    top: '-9999px',
+                    opacity: 0,
+                    pointerEvents: 'none'
+                }}
+                aria-hidden="true"
+                tabIndex={-1}
+            />
         </div>
     );
 };

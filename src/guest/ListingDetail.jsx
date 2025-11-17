@@ -104,6 +104,7 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
   const [userId, setUserId] = useState(null);
   const [bookingError, setBookingError] = useState("");
   const [bookingSuccess, setBookingSuccess] = useState("");
+  const copyInputRef = useRef(null);
   
   // Amenity icon mapping (matching AddListingModal)
   const amenityIcons = {
@@ -888,7 +889,7 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
           </div>
           <div className="flex gap-3">
             <button 
-              onClick={() => {
+              onClick={async () => {
                 const listingId = fullListingData?.id || listing?.id || listingData.id;
                 if (!listingId) {
                   alert("Unable to generate share link. Listing ID not found.");
@@ -898,64 +899,45 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
                 const baseUrl = window.location.origin;
                 const listingUrl = `${baseUrl}/guest?listingId=${listingId}`;
                 
-                // Use React DOM to copy link
-                const copyToClipboard = (text) => {
-                  // Create a temporary input element using React DOM
-                  const tempDiv = document.createElement('div');
-                  tempDiv.style.position = 'fixed';
-                  tempDiv.style.left = '-9999px';
-                  tempDiv.style.top = '-9999px';
-                  
-                  const tempInput = document.createElement('input');
-                  tempInput.value = text;
-                  tempInput.readOnly = true;
-                  tempDiv.appendChild(tempInput);
-                  document.body.appendChild(tempDiv);
-                  
-                  // Select and copy
-                  tempInput.select();
-                  tempInput.setSelectionRange(0, 99999); // For mobile devices
+                // Use React DOM ref to copy link
+                if (copyInputRef.current) {
+                  copyInputRef.current.value = listingUrl;
+                  copyInputRef.current.select();
+                  copyInputRef.current.setSelectionRange(0, 99999); // For mobile devices
                   
                   try {
-                    const successful = document.execCommand('copy');
-                    if (successful) {
+                    // Try modern clipboard API first
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                      await navigator.clipboard.writeText(listingUrl);
                       setShareCopied(true);
                       setTimeout(() => setShareCopied(false), 2000);
                     } else {
-                      // Fallback to clipboard API
-                      if (navigator.clipboard && navigator.clipboard.writeText) {
-                        navigator.clipboard.writeText(text).then(() => {
-                          setShareCopied(true);
-                          setTimeout(() => setShareCopied(false), 2000);
-                        }).catch((error) => {
-                          console.error("Failed to copy:", error);
-                          alert("Failed to copy link. Please try again.");
-                        });
+                      // Fallback to execCommand
+                      const successful = document.execCommand('copy');
+                      if (successful) {
+                        setShareCopied(true);
+                        setTimeout(() => setShareCopied(false), 2000);
                       } else {
                         alert("Failed to copy link. Please try again.");
                       }
                     }
                   } catch (err) {
                     console.error("Failed to copy:", err);
-                    // Fallback to clipboard API
-                    if (navigator.clipboard && navigator.clipboard.writeText) {
-                      navigator.clipboard.writeText(text).then(() => {
+                    // Try execCommand as fallback
+                    try {
+                      const successful = document.execCommand('copy');
+                      if (successful) {
                         setShareCopied(true);
                         setTimeout(() => setShareCopied(false), 2000);
-                      }).catch((error) => {
-                        console.error("Failed to copy:", error);
+                      } else {
                         alert("Failed to copy link. Please try again.");
-                      });
-                    } else {
+                      }
+                    } catch (fallbackErr) {
+                      console.error("Fallback copy failed:", fallbackErr);
                       alert("Failed to copy link. Please try again.");
                     }
-                  } finally {
-                    // Clean up
-                    document.body.removeChild(tempDiv);
                   }
-                };
-                
-                copyToClipboard(listingUrl);
+                }
               }}
               className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors bg-white"
               title="Copy listing link"
@@ -2245,6 +2227,22 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
           style={{ pointerEvents: 'none' }}
         />
       )}
+
+      {/* Hidden input for copying link using React DOM */}
+      <input
+        ref={copyInputRef}
+        type="text"
+        readOnly
+        style={{
+          position: 'fixed',
+          left: '-9999px',
+          top: '-9999px',
+          opacity: 0,
+          pointerEvents: 'none'
+        }}
+        aria-hidden="true"
+        tabIndex={-1}
+      />
 
     </div>
   );
