@@ -28,6 +28,9 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
                                    location.pathname === '/guest/bookings' || 
                                    location.pathname === '/guest/payments';
     
+    // Check if we're on a listing detail page
+    const isListingDetailPage = location.pathname.startsWith('/listing/');
+    
     // Refs for click outside detection
     const menuRef = useRef(null);
     const userMenuRef = useRef(null);

@@ -15,7 +15,12 @@ import {
     FaTimes,
     FaPowerOff,
     FaCalendar,
-    FaTicketAlt
+    FaTicketAlt,
+    FaDollarSign,
+    FaStar,
+    FaEye,
+    FaArrowUp,
+    FaArrowDown
 } from "react-icons/fa";
 import Messages from "./Messages";
 import Listings from "./Listings";
@@ -25,7 +30,7 @@ import Coupons from "./Coupons";
 import PaymentMethods from "./PaymentMethods";
 import PointsRewards from "./PointsRewards";
 import UserDetails from "../components/UserDetails";
-import { auth, getUserData, getUserType, getUnreadMessageCount, getHostBookings } from "../../Config";
+import { auth, getUserData, getUserType, getUnreadMessageCount, getHostBookings, getHostListings, getWalletBalance } from "../../Config";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import logo from "../assets/logo.png";
 
@@ -39,6 +44,19 @@ const Hostpage = () => {
     const [profilePicError, setProfilePicError] = useState(false);
     const [unreadMessageCount, setUnreadMessageCount] = useState(0);
     const [bookings, setBookings] = useState([]);
+    const [listings, setListings] = useState([]);
+    const [walletBalance, setWalletBalance] = useState(0);
+    const [dashboardStats, setDashboardStats] = useState({
+        totalBookings: 0,
+        activeBookings: 0,
+        totalRevenue: 0,
+        thisMonthRevenue: 0,
+        activeListings: 0,
+        totalListings: 0,
+        averageRating: 0,
+        pendingBookings: 0
+    });
+    const [loadingDashboard, setLoadingDashboard] = useState(true);
 
     // Function to fetch and update user data
     const fetchUserData = async (user) => {
@@ -111,20 +129,78 @@ const Hostpage = () => {
         return () => clearInterval(interval);
     }, []);
 
-    // Fetch bookings for overview
-    useEffect(() => {
-        const fetchBookings = async () => {
-            if (!auth.currentUser || activeTab !== "dashboard") return;
+    // Fetch dashboard data
+    const fetchDashboardData = async () => {
+        if (!auth.currentUser || activeTab !== "dashboard") return;
+        
+        try {
+            setLoadingDashboard(true);
+            const userId = auth.currentUser.uid;
             
-            try {
-                const hostBookings = await getHostBookings(auth.currentUser.uid);
-                setBookings(hostBookings);
-            } catch (error) {
-                console.error("Error fetching bookings for overview:", error);
-            }
-        };
+            // Fetch all data in parallel
+            const [hostBookings, hostListings, balance] = await Promise.all([
+                getHostBookings(userId),
+                getHostListings(userId),
+                getWalletBalance(userId)
+            ]);
+            
+            setBookings(hostBookings);
+            setListings(hostListings);
+            setWalletBalance(balance || 0);
+            
+            // Calculate statistics
+            const activeBookings = hostBookings.filter(b => b.status === "active").length;
+            const pendingBookings = hostBookings.filter(b => b.status === "pending").length;
+            const totalBookings = hostBookings.length;
+            
+            // Calculate revenue
+            const totalRevenue = hostBookings
+                .filter(b => b.status === "active" && b.totalAmount)
+                .reduce((sum, b) => sum + (b.totalAmount || 0), 0);
+            
+            // Calculate this month's revenue
+            const now = new Date();
+            const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const thisMonthRevenue = hostBookings
+                .filter(b => {
+                    if (!b.checkIn || b.status !== "active" || !b.totalAmount) return false;
+                    const checkInDate = b.checkIn.toDate();
+                    return checkInDate >= firstDayOfMonth;
+                })
+                .reduce((sum, b) => sum + (b.totalAmount || 0), 0);
+            
+            // Calculate listings stats
+            const activeListings = hostListings.filter(l => !l.isDraft).length;
+            const totalListings = hostListings.length;
+            
+            // Calculate average rating (if listings have ratings)
+            const listingsWithRatings = hostListings.filter(l => l.rating && l.rating > 0);
+            const averageRating = listingsWithRatings.length > 0
+                ? listingsWithRatings.reduce((sum, l) => sum + (l.rating || 0), 0) / listingsWithRatings.length
+                : 0;
+            
+            setDashboardStats({
+                totalBookings,
+                activeBookings,
+                totalRevenue,
+                thisMonthRevenue,
+                activeListings,
+                totalListings,
+                averageRating,
+                pendingBookings
+            });
+        } catch (error) {
+            console.error("Error fetching dashboard data:", error);
+        } finally {
+            setLoadingDashboard(false);
+        }
+    };
 
-        fetchBookings();
+    // Fetch dashboard data when tab is active
+    useEffect(() => {
+        if (activeTab === "dashboard") {
+            fetchDashboardData();
+        }
     }, [activeTab]);
 
     // Filter bookings by date
@@ -346,8 +422,150 @@ const Hostpage = () => {
                 <div className="flex-1 overflow-y-auto p-6">
                     {activeTab === "dashboard" && (
                         <div className="space-y-6">
-                            {/* Dashboard Tab Navigation */}
-                            <div className="flex gap-4 border-b border-gray-200">
+                            {/* Loading State */}
+                            {loadingDashboard ? (
+                                <div className="flex items-center justify-center h-64">
+                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                                </div>
+                            ) : (
+                                <>
+                                    {/* Statistics Cards */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                                        {/* Total Revenue Card */}
+                                        <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div>
+                                                    <p className="text-gray-600 text-sm mb-1">Total Revenue</p>
+                                                    <p className="text-2xl font-bold text-gray-900">
+                                                        ₱{dashboardStats.totalRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </p>
+                                                </div>
+                                                <div className="bg-green-100 p-3 rounded-lg">
+                                                    <FaDollarSign className="text-2xl text-green-600" />
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-sm">
+                                                <span className="text-gray-500">This month:</span>
+                                                <span className="text-green-600 font-semibold">
+                                                    ₱{dashboardStats.thisMonthRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Active Bookings Card */}
+                                        <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div>
+                                                    <p className="text-gray-600 text-sm mb-1">Active Bookings</p>
+                                                    <p className="text-2xl font-bold text-gray-900">{dashboardStats.activeBookings}</p>
+                                                </div>
+                                                <div className="bg-blue-100 p-3 rounded-lg">
+                                                    <FaCheckCircle className="text-2xl text-blue-600" />
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-sm">
+                                                <span className="text-gray-500">Total:</span>
+                                                <span className="text-gray-900 font-semibold">{dashboardStats.totalBookings}</span>
+                                                {dashboardStats.pendingBookings > 0 && (
+                                                    <>
+                                                        <span className="text-gray-400">•</span>
+                                                        <span className="text-yellow-600 font-semibold">{dashboardStats.pendingBookings} pending</span>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Active Listings Card */}
+                                        <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div>
+                                                    <p className="text-gray-600 text-sm mb-1">Active Listings</p>
+                                                    <p className="text-2xl font-bold text-gray-900">{dashboardStats.activeListings}</p>
+                                                </div>
+                                                <div className="bg-purple-100 p-3 rounded-lg">
+                                                    <FaList className="text-2xl text-purple-600" />
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-sm">
+                                                <span className="text-gray-500">Total:</span>
+                                                <span className="text-gray-900 font-semibold">{dashboardStats.totalListings}</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Wallet Balance Card */}
+                                        <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
+                                            <div className="flex items-center justify-between mb-4">
+                                                <div>
+                                                    <p className="text-gray-600 text-sm mb-1">Wallet Balance</p>
+                                                    <p className="text-2xl font-bold text-gray-900">
+                                                        ₱{walletBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    </p>
+                                                </div>
+                                                <div className="bg-indigo-100 p-3 rounded-lg">
+                                                    <FaCreditCard className="text-2xl text-indigo-600" />
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-sm">
+                                                <span className="text-gray-500">Available</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Additional Stats Row */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                                        {/* Average Rating Card */}
+                                        <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <p className="text-gray-600 text-sm mb-2">Average Rating</p>
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-3xl font-bold text-gray-900">
+                                                            {dashboardStats.averageRating > 0 ? dashboardStats.averageRating.toFixed(1) : 'N/A'}
+                                                        </p>
+                                                        {dashboardStats.averageRating > 0 && (
+                                                            <div className="flex items-center gap-1">
+                                                                <FaStar className="text-yellow-400 text-xl" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="bg-yellow-100 p-3 rounded-lg">
+                                                    <FaStar className="text-2xl text-yellow-600" />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Booking Status Distribution */}
+                                        <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
+                                            <h3 className="text-gray-900 font-semibold mb-4">Booking Status</h3>
+                                            <div className="space-y-3">
+                                                {[
+                                                    { label: "Active", count: dashboardStats.activeBookings, color: "bg-green-500", total: dashboardStats.totalBookings },
+                                                    { label: "Pending", count: dashboardStats.pendingBookings, color: "bg-yellow-500", total: dashboardStats.totalBookings },
+                                                    { label: "Total", count: dashboardStats.totalBookings, color: "bg-blue-500", total: dashboardStats.totalBookings }
+                                                ].map((status) => {
+                                                    const percentage = status.total > 0 ? (status.count / status.total) * 100 : 0;
+                                                    return (
+                                                        <div key={status.label} className="space-y-1">
+                                                            <div className="flex justify-between text-sm">
+                                                                <span className="text-gray-700 font-medium">{status.label}</span>
+                                                                <span className="text-gray-600">{status.count}</span>
+                                                            </div>
+                                                            <div className="w-full bg-gray-200 rounded-full h-2">
+                                                                <div
+                                                                    className={`${status.color} h-2 rounded-full transition-all`}
+                                                                    style={{ width: `${percentage}%` }}
+                                                                ></div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Dashboard Tab Navigation */}
+                                    <div className="flex gap-4 border-b border-gray-200">
                                 <button
                                     onClick={() => setActiveDashboardTab("today")}
                                     className={`flex items-center gap-2 px-4 py-3 border-b-2 transition ${
@@ -463,6 +681,8 @@ const Hostpage = () => {
                                         </div>
                                     )}
                                 </div>
+                            )}
+                                </>
                             )}
                         </div>
                     )}

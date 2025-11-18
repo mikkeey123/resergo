@@ -113,7 +113,7 @@ const AppContent = () => {
   }, [location.pathname, navigate]);
 
   const currentPage = location.pathname === '/' ? 'home' : 
-                     location.pathname.startsWith('/listing/') ? 'home' :
+                     location.pathname.startsWith('/listing/') ? 'guest' :
                      location.pathname.startsWith('/guest') ? 'guest' :
                      location.pathname.startsWith('/host') ? 'host' :
                      location.pathname.startsWith('/admin') ? 'admin' : 'home';

@@ -1,0 +1,261 @@
+# Fix Admin Withdrawal Approval Permissions
+
+## Problem
+Admins are getting "Missing or insufficient permissions" error when trying to approve withdrawals because the Firestore rules don't allow admins to update transactions and wallets.
+
+## Solution
+Add admin helper function and update transactions/wallets rules to allow admin access.
+
+## Steps to Fix:
+
+1. Go to [Firebase Console](https://console.firebase.google.com/)
+2. Select your project: `rgdatabase-10798`
+3. Navigate to **Firestore Database** > **Rules**
+4. Replace your current rules with the complete rules below:
+
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Helper function to get user data
+    function getUserData() {
+      return get(/databases/$(database)/documents/Resergodb/$(request.auth.uid)).data;
+    }
+    
+    // Helper function to check if user is a host
+    function isHost() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/Resergodb/$(request.auth.uid)) &&
+             getUserData().UserType == 'host';
+    }
+    
+    // Helper function to check if user is an admin
+    function isAdmin() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/Resergodb/$(request.auth.uid)) &&
+             getUserData().UserType == 'admin';
+    }
+    
+    // Resergodb collection - user data
+    match /Resergodb/{userId} {
+      // Allow authenticated users to read any user data (for displaying host profiles, etc.)
+      allow read: if isAuthenticated();
+      // Allow users to write their own data
+      allow write: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Listings collection
+    match /listings/{listingId} {
+      // Allow anyone to read published listings (not drafts)
+      allow read: if resource.data.isDraft == false || 
+                     (isAuthenticated() && resource.data.hostId == request.auth.uid);
+      
+      // Allow hosts to create listings
+      allow create: if isHost() && 
+                       request.resource.data.hostId == request.auth.uid;
+      
+      // Allow hosts to update their own listings
+      // Also allow authenticated users to update rating-related fields (for review system)
+      allow update: if (isHost() && 
+                       resource.data.hostId == request.auth.uid &&
+                       request.resource.data.hostId == request.auth.uid) ||
+                     (isAuthenticated() && 
+                       // Allow updating rating fields - ensure other critical fields remain unchanged
+                       request.resource.data.hostId == resource.data.hostId &&
+                       request.resource.data.title == resource.data.title &&
+                       request.resource.data.rate == resource.data.rate &&
+                       request.resource.data.isDraft == resource.data.isDraft);
+      
+      // Allow hosts to delete their own listings
+      allow delete: if isHost() && 
+                       resource.data.hostId == request.auth.uid;
+    }
+    
+    // Reviews collection - for guest comments/reviews
+    match /reviews/{reviewId} {
+      // Anyone can read reviews for published listings
+      allow read: if isAuthenticated();
+      
+      // Authenticated users can create reviews (comments)
+      // Guest ID must match the authenticated user's ID
+      allow create: if isAuthenticated() && 
+                       request.resource.data.guestId == request.auth.uid;
+      
+      // Users can only update their own reviews
+      allow update: if isAuthenticated() && 
+                       resource.data.guestId == request.auth.uid &&
+                       request.resource.data.guestId == request.auth.uid;
+      
+      // Users can only delete their own reviews
+      allow delete: if isAuthenticated() && 
+                       resource.data.guestId == request.auth.uid;
+    }
+    
+    // Favorites collection - for user's favorite listings
+    match /favorites/{userId} {
+      // Users can only read their own favorites
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Users can create their own favorites document
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Users can only update their own favorites
+      allow update: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Users can only delete their own favorites document
+      allow delete: if isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Messages collection - for user messages
+    match /messages/{messageId} {
+      // Users can read messages where they are sender or receiver
+      allow read: if isAuthenticated() && 
+                     (resource.data.senderId == request.auth.uid || 
+                      resource.data.receiverId == request.auth.uid);
+      
+      // Users can create messages where they are the sender
+      // Core validations: authenticated, senderId matches, receiverId and message are provided
+      // All other fields (listingId, read, timestamps) are allowed automatically
+      allow create: if isAuthenticated() && 
+                       request.resource.data.senderId == request.auth.uid &&
+                       request.resource.data.receiverId != null &&
+                       request.resource.data.message != null &&
+                       request.resource.data.message is string &&
+                       request.resource.data.message.size() > 0;
+      
+      // Users can update messages they received (to mark as read)
+      // Only allow updating read status and readAt timestamp
+      // Prevent changing sender, receiver, message content, or listingId
+      allow update: if isAuthenticated() && 
+                       resource.data.receiverId == request.auth.uid &&
+                       request.resource.data.senderId == resource.data.senderId &&
+                       request.resource.data.receiverId == resource.data.receiverId &&
+                       request.resource.data.message == resource.data.message;
+      
+      // Users cannot delete messages (for message history)
+      allow delete: if false;
+    }
+    
+    // CONVERSATIONS - ULTRA SIMPLIFIED VERSION
+    match /conversations/{conversationId} {
+      // Allow read if user is a participant OR if document doesn't exist (for checking)
+      allow read: if isAuthenticated() && 
+                     (!exists(/databases/$(database)/documents/conversations/$(conversationId)) ||
+                      resource.data.participant1Id == request.auth.uid || 
+                      resource.data.participant2Id == request.auth.uid);
+      
+      // Allow create if user is participant1 OR participant2 - NO OTHER CHECKS
+      allow create: if isAuthenticated() && 
+                       (request.resource.data.participant1Id == request.auth.uid || 
+                        request.resource.data.participant2Id == request.auth.uid);
+      
+      // Allow update if user is a participant - SIMPLIFIED
+      // setDoc with merge uses update rule if document exists
+      allow update: if isAuthenticated() && 
+                       (resource.data.participant1Id == request.auth.uid || 
+                        resource.data.participant2Id == request.auth.uid);
+      
+      allow delete: if false;
+    }
+    
+    // Wallets collection - for user e-wallet balances
+    match /wallets/{userId} {
+      // Users can read their own wallet, admins can read any wallet
+      allow read: if isAuthenticated() && 
+                     (request.auth.uid == userId || isAdmin());
+      
+      // Users can create their own wallet
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Users can update their own wallet, admins can update any wallet (for withdrawal approval)
+      allow update: if (isAuthenticated() && request.auth.uid == userId) || isAdmin();
+      
+      // Users cannot delete their wallet
+      allow delete: if false;
+    }
+    
+    // Transactions collection - for wallet transactions (top-up, withdrawal)
+    match /transactions/{transactionId} {
+      // Users can read their own transactions, admins can read any transaction
+      allow read: if isAuthenticated() && 
+                     (resource.data.userId == request.auth.uid || isAdmin());
+      
+      // Users can create transactions for themselves
+      allow create: if isAuthenticated() && 
+                       request.resource.data.userId == request.auth.uid;
+      
+      // Users can update their own transactions, admins can update any transaction (for approval/rejection)
+      allow update: if (isAuthenticated() && 
+                       resource.data.userId == request.auth.uid &&
+                       request.resource.data.userId == request.auth.uid) || isAdmin();
+      
+      // Users cannot delete transactions (for transaction history)
+      allow delete: if false;
+    }
+    
+    // Bookings collection - for booking reservations
+    match /bookings/{bookingId} {
+      // Users can read bookings where they are guest or host, admins can read any booking
+      allow read: if isAuthenticated() && 
+                     (resource.data.guestId == request.auth.uid || 
+                      resource.data.hostId == request.auth.uid || 
+                      isAdmin());
+      
+      // Guests can create bookings
+      allow create: if isAuthenticated() && 
+                       request.resource.data.guestId == request.auth.uid;
+      
+      // Hosts can update their own bookings, guests can update their own bookings, admins can update any booking
+      allow update: if (isAuthenticated() && 
+                       (resource.data.hostId == request.auth.uid || 
+                        resource.data.guestId == request.auth.uid)) || isAdmin();
+      
+      // Users cannot delete bookings (for booking history)
+      allow delete: if false;
+    }
+    
+    // Coupons collection - for discount coupons
+    match /coupons/{couponId} {
+      // Anyone authenticated can read coupons
+      allow read: if isAuthenticated();
+      
+      // Only hosts can create coupons for their own listings
+      allow create: if isHost() && 
+                       request.resource.data.hostId == request.auth.uid;
+      
+      // Hosts can update their own coupons, admins can update any coupon
+      allow update: if (isHost() && 
+                       resource.data.hostId == request.auth.uid) || isAdmin();
+      
+      // Hosts can delete their own coupons, admins can delete any coupon
+      allow delete: if (isHost() && 
+                       resource.data.hostId == request.auth.uid) || isAdmin();
+    }
+  }
+}
+```
+
+## What Changed:
+
+1. **Added `isAdmin()` helper function** - Checks if the user's UserType is 'admin'
+2. **Updated `wallets` collection rules** - Admins can now read and update any wallet
+3. **Updated `transactions` collection rules** - Admins can now read and update any transaction
+4. **Added `bookings` collection rules** - Admins can read and update any booking
+5. **Added `coupons` collection rules** - Admins can update and delete any coupon
+
+## Testing:
+
+After updating the rules:
+1. Try approving a withdrawal in the admin panel
+2. Try rejecting a withdrawal in the admin panel
+3. Check that the transaction status updates correctly
+4. Check that the wallet balance updates correctly
+
+All admin operations should now work without permission errors.
+
