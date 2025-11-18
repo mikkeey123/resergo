@@ -197,14 +197,6 @@ const Favorites = ({ onBack }) => {
         <div className="bg-white py-4 sm:py-8 px-3 sm:px-8 md:px-12 lg:px-16 min-h-screen">
             <div className="max-w-7xl mx-auto">
                 <div className="mb-8">
-                    {onBack && (
-                        <button
-                            onClick={onBack}
-                            className="text-blue-600 hover:text-blue-700 font-semibold text-lg mb-6"
-                        >
-                            Back
-                        </button>
-                    )}
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                         <h2 className="text-3xl font-bold text-gray-900">
                             Your Favorites

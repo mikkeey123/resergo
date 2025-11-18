@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FaCalendarAlt, FaClock, FaCheckCircle, FaTimes, FaBan, FaChevronDown, FaChevronUp, FaMoneyBillWave, FaTag, FaUser, FaHome, FaArrowLeft } from "react-icons/fa";
+import { FaCalendarAlt, FaClock, FaCheckCircle, FaTimes, FaBan, FaChevronDown, FaChevronUp, FaMoneyBillWave, FaTag, FaUser, FaHome } from "react-icons/fa";
 import { auth, getGuestBookings, requestCancelBooking } from "../../Config";
 
 const Bookings = ({ onBack }) => {
@@ -149,17 +149,6 @@ const Bookings = ({ onBack }) => {
     return (
         <div className="bg-white min-h-screen py-8 px-4 sm:px-8 md:px-12 lg:px-16">
             <div className="max-w-6xl mx-auto space-y-6">
-                {/* Back Button */}
-                {onBack && (
-                    <button
-                        onClick={onBack}
-                        className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium mb-4 transition-colors"
-                    >
-                        <FaArrowLeft />
-                        <span>Back to Listings</span>
-                    </button>
-                )}
-
                 {/* Page Title */}
                 <div className="mb-6">
                     <h1 className="text-3xl font-bold text-gray-900">My Bookings</h1>

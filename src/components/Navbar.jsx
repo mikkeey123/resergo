@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useLocation } from "react-router-dom";
 import logo from "../assets/logo.png";
 import Loginmodal from "../auth/Loginmodal";
 import LoginForm from "../auth/LoginForm"; 
@@ -10,6 +11,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import SearchFilter from "./SearchFilter";
 
 const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNavigateToHost, onNavigateToHome, onShowGoogleSignupModal, onNavigateToFavorites, onNavigateToPayments, onNavigateToBookings, onSearchFilters, searchFilters = {} }) => {
+    const location = useLocation();
     const [loginOpen, setLoginOpen] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -20,6 +22,11 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
     const [user, setUser] = useState(null); // null = not logged in, object with profilePic and username = logged in
     const [userType, setUserType] = useState(null); // 'guest' or 'host' - user type from Firestore
     const [showSearchFilter, setShowSearchFilter] = useState(false);
+    
+    // Check if we're on a page where search filter should be hidden
+    const shouldHideSearchFilter = location.pathname === '/guest/favorites' || 
+                                   location.pathname === '/guest/bookings' || 
+                                   location.pathname === '/guest/payments';
     
     // Refs for click outside detection
     const menuRef = useRef(null);
@@ -306,7 +313,7 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
                             </div>
                         </div>
                     </>
-                ) : currentPage !== "host" ? (
+                ) : currentPage !== "host" && !shouldHideSearchFilter ? (
                     <>
                         {/* Mobile Search Button */}
                         <button
@@ -558,7 +565,7 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
                 </Loginmodal>
 
                 {/* Search Filter Modal */}
-                {currentPage !== "host" && currentPage !== "home" && (
+                {currentPage !== "host" && currentPage !== "home" && !shouldHideSearchFilter && (
                     <SearchFilter
                         isOpen={showSearchFilter}
                         onClose={() => setShowSearchFilter(false)}
