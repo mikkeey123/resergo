@@ -869,15 +869,6 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
   return (
     <div className="min-h-screen bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header with Back Button */}
-        {onBack && (
-          <button
-            onClick={onBack}
-            className="text-blue-600 hover:text-blue-700 font-semibold text-lg mb-6"
-          >
-            Back
-          </button>
-        )}
         {/* Title and Actions */}
         <div className="flex justify-between items-start mb-6">
           <div>

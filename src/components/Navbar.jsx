@@ -178,9 +178,19 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
                         <div className="hidden md:flex absolute left-1/2 transform -translate-x-1/2 items-center gap-6 lg:gap-8">
                             <button
                                 onClick={() => {
-                                    const element = document.getElementById("home");
-                                    if (element) {
-                                        element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                    if (location.pathname !== '/') {
+                                        onNavigateToHome && onNavigateToHome();
+                                        setTimeout(() => {
+                                            const element = document.getElementById("home");
+                                            if (element) {
+                                                element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                            }
+                                        }, 100);
+                                    } else {
+                                        const element = document.getElementById("home");
+                                        if (element) {
+                                            element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                        }
                                     }
                                 }}
                                 className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors duration-200"
@@ -189,9 +199,19 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
                             </button>
                             <button
                                 onClick={() => {
-                                    const element = document.getElementById("features");
-                                    if (element) {
-                                        element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                    if (location.pathname !== '/') {
+                                        onNavigateToHome && onNavigateToHome();
+                                        setTimeout(() => {
+                                            const element = document.getElementById("features");
+                                            if (element) {
+                                                element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                            }
+                                        }, 100);
+                                    } else {
+                                        const element = document.getElementById("features");
+                                        if (element) {
+                                            element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                        }
                                     }
                                 }}
                                 className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors duration-200"
@@ -200,9 +220,19 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
                             </button>
                             <button
                                 onClick={() => {
-                                    const element = document.getElementById("guests");
-                                    if (element) {
-                                        element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                    if (location.pathname !== '/') {
+                                        onNavigateToHome && onNavigateToHome();
+                                        setTimeout(() => {
+                                            const element = document.getElementById("guests");
+                                            if (element) {
+                                                element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                            }
+                                        }, 100);
+                                    } else {
+                                        const element = document.getElementById("guests");
+                                        if (element) {
+                                            element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                        }
                                     }
                                 }}
                                 className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors duration-200"
@@ -211,9 +241,19 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
                             </button>
                             <button
                                 onClick={() => {
-                                    const element = document.getElementById("hosts");
-                                    if (element) {
-                                        element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                    if (location.pathname !== '/') {
+                                        onNavigateToHome && onNavigateToHome();
+                                        setTimeout(() => {
+                                            const element = document.getElementById("hosts");
+                                            if (element) {
+                                                element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                            }
+                                        }, 100);
+                                    } else {
+                                        const element = document.getElementById("hosts");
+                                        if (element) {
+                                            element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                        }
                                     }
                                 }}
                                 className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors duration-200"
@@ -222,9 +262,19 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
                             </button>
                             <button
                                 onClick={() => {
-                                    const element = document.getElementById("cta");
-                                    if (element) {
-                                        element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                    if (location.pathname !== '/') {
+                                        onNavigateToHome && onNavigateToHome();
+                                        setTimeout(() => {
+                                            const element = document.getElementById("cta");
+                                            if (element) {
+                                                element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                            }
+                                        }, 100);
+                                    } else {
+                                        const element = document.getElementById("cta");
+                                        if (element) {
+                                            element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                        }
                                     }
                                 }}
                                 className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors duration-200"
@@ -251,9 +301,19 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
                                                 className="w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors duration-150"
                                                 onClick={() => {
                                                     setMenuOpen(false);
-                                                    const element = document.getElementById("home");
-                                                    if (element) {
-                                                        element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                                    if (location.pathname !== '/') {
+                                                        onNavigateToHome && onNavigateToHome();
+                                                        setTimeout(() => {
+                                                            const element = document.getElementById("home");
+                                                            if (element) {
+                                                                element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                                            }
+                                                        }, 100);
+                                                    } else {
+                                                        const element = document.getElementById("home");
+                                                        if (element) {
+                                                            element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                                        }
                                                     }
                                                 }}
                                             >
@@ -263,9 +323,19 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
                                                 className="w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors duration-150"
                                                 onClick={() => {
                                                     setMenuOpen(false);
-                                                    const element = document.getElementById("features");
-                                                    if (element) {
-                                                        element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                                    if (location.pathname !== '/') {
+                                                        onNavigateToHome && onNavigateToHome();
+                                                        setTimeout(() => {
+                                                            const element = document.getElementById("features");
+                                                            if (element) {
+                                                                element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                                            }
+                                                        }, 100);
+                                                    } else {
+                                                        const element = document.getElementById("features");
+                                                        if (element) {
+                                                            element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                                        }
                                                     }
                                                 }}
                                             >
@@ -275,9 +345,19 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
                                                 className="w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors duration-150"
                                                 onClick={() => {
                                                     setMenuOpen(false);
-                                                    const element = document.getElementById("guests");
-                                                    if (element) {
-                                                        element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                                    if (location.pathname !== '/') {
+                                                        onNavigateToHome && onNavigateToHome();
+                                                        setTimeout(() => {
+                                                            const element = document.getElementById("guests");
+                                                            if (element) {
+                                                                element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                                            }
+                                                        }, 100);
+                                                    } else {
+                                                        const element = document.getElementById("guests");
+                                                        if (element) {
+                                                            element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                                        }
                                                     }
                                                 }}
                                             >
@@ -287,9 +367,19 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
                                                 className="w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors duration-150"
                                                 onClick={() => {
                                                     setMenuOpen(false);
-                                                    const element = document.getElementById("hosts");
-                                                    if (element) {
-                                                        element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                                    if (location.pathname !== '/') {
+                                                        onNavigateToHome && onNavigateToHome();
+                                                        setTimeout(() => {
+                                                            const element = document.getElementById("hosts");
+                                                            if (element) {
+                                                                element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                                            }
+                                                        }, 100);
+                                                    } else {
+                                                        const element = document.getElementById("hosts");
+                                                        if (element) {
+                                                            element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                                        }
                                                     }
                                                 }}
                                             >
@@ -299,9 +389,19 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
                                                 className="w-full px-4 py-3 text-left text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors duration-150"
                                                 onClick={() => {
                                                     setMenuOpen(false);
-                                                    const element = document.getElementById("cta");
-                                                    if (element) {
-                                                        element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                                    if (location.pathname !== '/') {
+                                                        onNavigateToHome && onNavigateToHome();
+                                                        setTimeout(() => {
+                                                            const element = document.getElementById("cta");
+                                                            if (element) {
+                                                                element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                                            }
+                                                        }, 100);
+                                                    } else {
+                                                        const element = document.getElementById("cta");
+                                                        if (element) {
+                                                            element.scrollIntoView({ behavior: "smooth", block: "start" });
+                                                        }
                                                     }
                                                 }}
                                             >
