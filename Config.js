@@ -3496,4 +3496,4 @@ export const getWishlistByListing = async (listingId) => {
     }
 };
 
-export { auth, db, googleProvider, handleGoogleSignup, checkUserExists, checkAccountComplete, saveGoogleUserData, saveAdminUserData, saveHostUserData, getUserData, getUserDataByEmail, getUserType, updatePasswordInFirestore, verifyPassword, updateProfilePicture, updateUserProfile, updateUserType, linkEmailPasswordToGoogleAccount, saveListing, updateListing, getListing, deleteListing, getHostListings, getPublishedListings, saveReview, getListingReviews, updateListingRating, updateReview, getAllAvailableCoupons, createWishlist, getHostWishlists, getWishlistByListing };
+export { auth, db, googleProvider, handleGoogleSignup, checkUserExists, checkAccountComplete, saveGoogleUserData, saveAdminUserData, saveHostUserData, getUserData, getUserDataByEmail, getUserType, updatePasswordInFirestore, verifyPassword, updateProfilePicture, updateUserProfile, updateUserType, linkEmailPasswordToGoogleAccount, saveListing, updateListing, getListing, deleteListing, getHostListings, getPublishedListings, saveReview, getListingReviews, updateListingRating, updateReview };
