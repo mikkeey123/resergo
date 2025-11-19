@@ -52,9 +52,12 @@ import {
   FaInfoCircle,
   FaChevronLeft,
   FaChevronRight,
-  FaTimes
+  FaTimes,
+  FaTicketAlt,
+  FaCopy,
+  FaCheck
 } from "react-icons/fa";
-import { getListing, getUserData, saveReview, getListingReviews, updateReview, updateListingRating, auth, db, validateCoupon, createBooking, addFavorite, removeFavorite, isFavorite } from "../../Config";
+import { getListing, getUserData, saveReview, getListingReviews, updateReview, updateListingRating, auth, db, validateCoupon, createBooking, addFavorite, removeFavorite, isFavorite, getListingCoupons } from "../../Config";
 import WishlistModal from "./WishlistModal";
 import { doc, deleteDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
@@ -107,6 +110,11 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
   const [bookingError, setBookingError] = useState("");
   const [bookingSuccess, setBookingSuccess] = useState("");
   const copyInputRef = useRef(null);
+  const [showCouponsModal, setShowCouponsModal] = useState(false);
+  const [availableCoupons, setAvailableCoupons] = useState([]);
+  const [loadingCoupons, setLoadingCoupons] = useState(false);
+  const [copiedCouponCode, setCopiedCouponCode] = useState(null);
+  const couponCopyInputRef = useRef(null);
   
   // Amenity icon mapping (matching AddListingModal)
   const amenityIcons = {
@@ -960,6 +968,16 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
               <FaHeart className={isFavoriteListing ? "text-red-600" : "text-gray-700"} />
               <span className={`text-sm font-medium ${isFavoriteListing ? 'text-red-600' : 'text-gray-700'}`}>
                 {favoriteLoading ? "Saving..." : isFavoriteListing ? "Saved" : "Save"}
+              </span>
+            </button>
+            <button 
+              onClick={handleOpenCouponsModal}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors bg-white"
+              title="View available coupons"
+            >
+              <FaTicketAlt className="text-gray-700" />
+              <span className="text-sm font-medium text-gray-700">
+                Coupons Available
               </span>
             </button>
           </div>

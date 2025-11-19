@@ -140,9 +140,6 @@ const AppContent = () => {
           onNavigateToBookings={() => {
             navigate('/guest/bookings');
           }}
-          onNavigateToCoupons={() => {
-            navigate('/guest/coupons');
-          }}
           onNavigateToMessages={() => {
             window.dispatchEvent(new CustomEvent('openMessagesModal'));
           }}
@@ -237,20 +234,6 @@ const AppContent = () => {
               <ProtectedRoute>
                 <Guestpage 
                   currentView="bookings"
-                  onBackToListings={() => navigate('/guest')}
-                  onNavigateToMessages={() => {}}
-                  searchFilters={searchFilters}
-                  onSearchFilters={(filters) => setSearchFilters(filters)}
-                />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/guest/coupons" 
-            element={
-              <ProtectedRoute>
-                <Guestpage 
-                  currentView="coupons"
                   onBackToListings={() => navigate('/guest')}
                   onNavigateToMessages={() => {}}
                   searchFilters={searchFilters}

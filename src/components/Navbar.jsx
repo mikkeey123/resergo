@@ -4,13 +4,13 @@ import { useLocation } from "react-router-dom";
 import logo from "../assets/logo.png";
 import Loginmodal from "../auth/Loginmodal";
 import LoginForm from "../auth/LoginForm"; 
-import { FaRegUser, FaSearch, FaCalendarAlt, FaWallet, FaHeart, FaList, FaSignOutAlt, FaTicketAlt } from "react-icons/fa";
+import { FaRegUser, FaSearch, FaCalendarAlt, FaWallet, FaHeart, FaList, FaSignOutAlt } from "react-icons/fa";
 import { FiMenu } from "react-icons/fi";
 import { auth, getUserData, getUserType } from "../../Config";
 import { onAuthStateChanged } from "firebase/auth";
 import SearchFilter from "./SearchFilter";
 
-const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNavigateToHost, onNavigateToHome, onShowGoogleSignupModal, onNavigateToFavorites, onNavigateToPayments, onNavigateToBookings, onNavigateToCoupons, onSearchFilters, searchFilters = {} }) => {
+const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNavigateToHost, onNavigateToHome, onShowGoogleSignupModal, onNavigateToFavorites, onNavigateToPayments, onNavigateToBookings, onSearchFilters, searchFilters = {} }) => {
     const location = useLocation();
     const [loginOpen, setLoginOpen] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
@@ -617,18 +617,6 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
                                                 >
                                                     <FaHeart className="text-lg text-gray-500" />
                                                     <span className="text-sm font-medium">Favorites</span>
-                                                </button>
-                                                <button 
-                                                    className="w-full px-4 py-3 flex items-center gap-3 text-gray-700 hover:bg-gray-50 transition-colors duration-150 text-left"
-                                                    onClick={() => {
-                                                        setMenuOpen(false);
-                                                        if (onNavigateToCoupons) {
-                                                            onNavigateToCoupons();
-                                                        }
-                                                    }}
-                                                >
-                                                    <FaTicketAlt className="text-lg text-gray-500" />
-                                                    <span className="text-sm font-medium">Coupons</span>
                                                 </button>
                                             </>
                                         )}
