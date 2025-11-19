@@ -692,15 +692,4 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
 };
 
 export default Navbar;
-    );
-};
-
-export default Navbar;
-
-            </div>
-        </div>
-    );
-};
-
-export default Navbar;
 
