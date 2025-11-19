@@ -85,10 +85,17 @@ const Services = ({ onListingClick }) => {
                         }
                     }
                     
+                    // Calculate discount and discounted price
+                    const originalPrice = listing.rate || 0;
+                    const discountPercent = listing.discount || 0;
+                    const discountedPrice = discountPercent > 0 ? originalPrice * (1 - discountPercent / 100) : originalPrice;
+                    
                     return {
                         id: listing.id,
                         title: listing.title || "Untitled Service",
-                        price: listing.rate || 0,
+                        price: originalPrice,
+                        discountedPrice: discountedPrice,
+                        discount: discountPercent,
                         rating: listing.rating || null, // Use actual rating from Firestore
                         image: imageUrl,
                         photos: listing.images || [],
@@ -321,7 +328,17 @@ const Services = ({ onListingClick }) => {
                         {listing.title}
                     </h3>
                     <div className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-900 flex-wrap">
-                        <span>₱{listing.price.toLocaleString()}</span>
+                        {listing.discount > 0 && listing.discountedPrice ? (
+                            <>
+                                <span className="line-through text-gray-400">₱{listing.price.toLocaleString()}</span>
+                                <span className="text-red-600 font-semibold">₱{listing.discountedPrice.toLocaleString()}</span>
+                                <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-medium">
+                                    -{listing.discount}%
+                                </span>
+                            </>
+                        ) : (
+                            <span>₱{listing.price.toLocaleString()}</span>
+                        )}
                         {listing.rating !== null && listing.rating > 0 && (
                             <>
                                 <span>•</span>
