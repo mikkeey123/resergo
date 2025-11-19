@@ -758,6 +758,52 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
     setCouponError("");
   };
 
+  // Fetch available coupons for this listing's host
+  const fetchAvailableCoupons = async () => {
+    if (!fullListingData?.hostId) return;
+    
+    setLoadingCoupons(true);
+    try {
+      const coupons = await getListingCoupons(fullListingData.hostId);
+      setAvailableCoupons(coupons);
+    } catch (error) {
+      console.error("Error fetching coupons:", error);
+      setAvailableCoupons([]);
+    } finally {
+      setLoadingCoupons(false);
+    }
+  };
+
+  // Open coupons modal and fetch coupons
+  const handleOpenCouponsModal = () => {
+    setShowCouponsModal(true);
+    fetchAvailableCoupons();
+  };
+
+  // Copy coupon code
+  const handleCopyCouponCode = (code) => {
+    if (couponCopyInputRef.current) {
+      couponCopyInputRef.current.value = code;
+      couponCopyInputRef.current.select();
+      couponCopyInputRef.current.setSelectionRange(0, 99999);
+
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(code);
+          setCopiedCouponCode(code);
+          setTimeout(() => setCopiedCouponCode(null), 2000);
+        } else {
+          document.execCommand('copy');
+          setCopiedCouponCode(code);
+          setTimeout(() => setCopiedCouponCode(null), 2000);
+        }
+      } catch (err) {
+        console.error("Failed to copy:", err);
+        alert("Failed to copy coupon code. Please try again.");
+      }
+    }
+  };
+
   const calculateTotal = () => {
     if (!checkIn || !checkOut) {
       return listingData.price;
