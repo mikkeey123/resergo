@@ -389,19 +389,4 @@ const Expiriences = ({ onListingClick }) => {
 
 export default Expiriences;
 
-                                itemId={itemId}
-                                isFavorited={favorites.has(itemId)}
-                                onToggleFavorite={toggleFavorite}
-                                onListingClick={onListingClick}
-                            />
-                        );
-                    })}
-                </div>
-            )} */}
-        </div>
-    );
-};
-
-export default Expiriences;
-
 

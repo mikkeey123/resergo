@@ -2060,34 +2060,3 @@ const Adminpage = () => {
 };
 
 export default Adminpage;
-
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Account Settings Tab */}
-                    {activeTab === "settings" && (
-                        <UserDetails 
-                            onBack={async () => {
-                                const user = auth.currentUser;
-                                if (user) {
-                                    await fetchUserData(user);
-                                }
-                                setActiveTab("analytics");
-                            }}
-                            hideBackButton={true}
-                            isHostPage={false}
-                        />
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-export default Adminpage;

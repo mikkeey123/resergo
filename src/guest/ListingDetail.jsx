@@ -2259,21 +2259,3 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
 
 export default ListingDetail;
 
-
-      {/* Wishlist Modal */}
-      {fullListingData && (
-        <WishlistModal
-          isOpen={showWishlistModal}
-          onClose={() => setShowWishlistModal(false)}
-          listingId={fullListingData.id}
-          listingTitle={fullListingData.title}
-          hostId={fullListingData.hostId}
-        />
-      )}
-
-    </div>
-  );
-};
-
-export default ListingDetail;
-

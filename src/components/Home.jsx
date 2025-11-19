@@ -289,19 +289,4 @@ const Home = ({ onListingClick = null }) => {
 };
 
 export default Home;
-                                listing={home}
-                                itemId={home.id}
-                                isFavorited={favorites.has(home.id)}
-                                onToggleFavorite={toggleFavorite}
-                                onListingClick={onListingClick || (() => console.warn("onListingClick not provided to ListingCard"))}
-                            />
-                        );
-                    })}
-                </div>
-            )} */}
-        </div>
-    );
-};
-
-export default Home;
 

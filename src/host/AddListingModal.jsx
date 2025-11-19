@@ -1193,27 +1193,4 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
 
 export default AddListingModal;
 
-                            >
-                                <FaSave />
-                                Save as Draft
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={loading || (!editingListing && (!images || images.length !== 5))}
-                                className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-md"
-                                title={!editingListing && (!images || images.length !== 5) ? "5 images are required to publish" : ""}
-                            >
-                                {loading ? (editingListing ? "Updating..." : "Publishing...") : (editingListing ? "Update Listing" : "Publish Listing")}
-                            </button>
-                        </div>
-                    </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-export default AddListingModal;
-
 

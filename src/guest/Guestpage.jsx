@@ -158,9 +158,4 @@ const Guestpage = ({ currentView = "listings", onBackToListings, onNavigateToMes
 
 export default Guestpage;
 
-    );
-};
-
-export default Guestpage;
-
 

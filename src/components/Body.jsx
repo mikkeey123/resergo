@@ -480,15 +480,4 @@ const Body = ({ activeSelection, showDynamicSection = true, onListingClick, sear
 };
 
 export default Body;
-                            })}
-                        </div>
-                    )}
-                </div>
-
-            </div>
-        </div>
-    );
-};
-
-export default Body;
 
