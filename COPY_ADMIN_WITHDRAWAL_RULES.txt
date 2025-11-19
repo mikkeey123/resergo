@@ -26,6 +26,12 @@ service cloud.firestore {
              getUserData().UserType == 'admin';
     }
     
+    // Helper function to safely check if user is host (for booking updates)
+    function isHostForBooking() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/Resergodb/$(request.auth.uid));
+    }
+    
     // Resergodb collection - user data
     match /Resergodb/{userId} {
       // Allow authenticated users to read any user data (for displaying host profiles, etc.)
@@ -205,8 +211,12 @@ service cloud.firestore {
       // When using updateDoc, request.resource.data contains merged data (existing + updates)
       // Only allow updating status, paymentStatus, and updatedAt fields - prevent changing critical fields
       allow update: if isAdmin() || 
-                     (isAuthenticated() && resource.data.hostId == request.auth.uid) ||
-                     (isAuthenticated() && resource.data.guestId == request.auth.uid);
+                     (isAuthenticated() && 
+                      resource.data.hostId != null &&
+                      resource.data.hostId == request.auth.uid) ||
+                     (isAuthenticated() && 
+                      resource.data.guestId != null &&
+                      resource.data.guestId == request.auth.uid);
       
       // Users cannot delete bookings (for booking history)
       allow delete: if false;
