@@ -86,33 +86,49 @@ const Services = ({ onListingClick }) => {
                         }
                     }
                     
-                    // Calculate discount and discounted price
-                    const originalPrice = listing.rate || 0;
-                    const discountPercent = listing.discount || 0;
-                    const discountedPrice = discountPercent > 0 ? originalPrice * (1 - discountPercent / 100) : originalPrice;
-                    
-                    return {
-                        id: listing.id,
-                        title: listing.title || "Untitled Service",
-                        price: originalPrice,
-                        discountedPrice: discountedPrice,
-                        discount: discountPercent,
-                        rating: listing.rating || null, // Use actual rating from Firestore
-                        image: imageUrl,
-                        photos: listing.images || [],
-                        location: listing.location?.city || listing.location?.address || "Location not specified",
-                        description: listing.description || "",
-                        currency: "₱",
-                        reviewsCount: listing.reviewsCount || 0, // Use actual reviews count from Firestore
-                        basics: listing.basics || { guests: 1, bedrooms: 1, beds: 1, bathrooms: 1 },
-                        amenities: listing.amenities || [],
-                        category: listing.category || "Service",
-                        // Include full listing data for detail view
-                        fullListing: listing
-                    };
-                });
+                        // Calculate discount and discounted price
+                        const originalPrice = listing.rate || 0;
+                        const discountPercent = listing.discount || 0;
+                        const discountedPrice = discountPercent > 0 ? originalPrice * (1 - discountPercent / 100) : originalPrice;
+                        
+                        // Fetch host data
+                        let hostName = "Unknown Host";
+                        let hostAvatar = null;
+                        if (listing.hostId) {
+                            try {
+                                const hostData = await getUserData(listing.hostId);
+                                hostName = hostData?.Username || hostData?.displayName || "Unknown Host";
+                                hostAvatar = hostData?.ProfilePicture || hostData?.photoURL || null;
+                            } catch (err) {
+                                console.error(`Error fetching host data for listing ${listing.id}:`, err);
+                            }
+                        }
+                        
+                        return {
+                            id: listing.id,
+                            title: listing.title || "Untitled Service",
+                            price: originalPrice,
+                            discountedPrice: discountedPrice,
+                            discount: discountPercent,
+                            rating: listing.rating || null, // Use actual rating from Firestore
+                            image: imageUrl,
+                            photos: listing.images || [],
+                            location: listing.location?.city || listing.location?.address || "Location not specified",
+                            description: listing.description || "",
+                            currency: "₱",
+                            reviewsCount: listing.reviewsCount || 0, // Use actual reviews count from Firestore
+                            basics: listing.basics || { guests: 1, bedrooms: 1, beds: 1, bathrooms: 1 },
+                            amenities: listing.amenities || [],
+                            category: listing.category || "Service",
+                            hostName: hostName,
+                            hostAvatar: hostAvatar,
+                            // Include full listing data for detail view
+                            fullListing: listing
+                        };
+                    })
+                );
                 
-                setServices(servicesWithHostData);
+                setServices(transformedServices);
             } catch (error) {
                 console.error("Error fetching services:", error);
                 setServices([]);
