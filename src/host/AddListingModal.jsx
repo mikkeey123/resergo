@@ -9,6 +9,7 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
     const [category, setCategory] = useState("Home");
     const [title, setTitle] = useState("");
     const [rate, setRate] = useState("");
+    const [discount, setDiscount] = useState(""); // Discount percentage
     const [images, setImages] = useState([]); // Store image URLs
     const [imageUrl, setImageUrl] = useState("");
     const [isDragging, setIsDragging] = useState(false);
@@ -88,6 +89,7 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
             setCategory(editingListing.category || "Home");
             setTitle(editingListing.title || "");
             setRate(editingListing.rate?.toString() || "");
+            setDiscount(editingListing.discount?.toString() || "");
             setImages(editingListing.images || []);
             setCity(editingListing.location?.city || "");
             setAddress(editingListing.location?.address || "");
@@ -119,6 +121,7 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
             setCategory("Home");
             setTitle("");
             setRate("");
+            setDiscount("");
             setImages([]);
             setCity("");
             setAddress("");
@@ -256,6 +259,7 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
         setCategory("Home");
         setTitle("");
         setRate("");
+        setDiscount("");
         setImages([]);
         setCity("");
         setAddress("");
@@ -297,6 +301,7 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
                 category,
                 title, // Title is now required for all categories
                 rate: parseFloat(rate) || 0,
+                discount: discount ? parseFloat(discount) : 0, // Discount percentage (0-100)
                 images,
                 location: {
                     city,
@@ -417,6 +422,7 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
                 category,
                 title, // Title is now required for all categories
                 rate: parseFloat(rate) || 0,
+                discount: discount ? parseFloat(discount) : 0, // Discount percentage (0-100)
                 images,
                 location: {
                     city,
@@ -710,6 +716,24 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
                                 step="0.01"
                                 required
                             />
+                        </div>
+
+                        {/* Discount */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Discount (%)
+                            </label>
+                            <input
+                                type="number"
+                                value={discount}
+                                onChange={(e) => setDiscount(e.target.value)}
+                                className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
+                                placeholder="e.g., 10"
+                                min="0"
+                                max="100"
+                                step="0.1"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">Optional: Enter discount percentage (0-100)</p>
                         </div>
 
                         {/* Location */}
@@ -1168,4 +1192,28 @@ const AddListingModal = ({ isOpen, onClose, onSuccess, editingListing = null }) 
 };
 
 export default AddListingModal;
+
+                            >
+                                <FaSave />
+                                Save as Draft
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={loading || (!editingListing && (!images || images.length !== 5))}
+                                className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-md"
+                                title={!editingListing && (!images || images.length !== 5) ? "5 images are required to publish" : ""}
+                            >
+                                {loading ? (editingListing ? "Updating..." : "Publishing...") : (editingListing ? "Update Listing" : "Publish Listing")}
+                            </button>
+                        </div>
+                    </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default AddListingModal;
+
 

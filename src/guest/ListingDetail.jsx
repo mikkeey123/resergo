@@ -55,6 +55,7 @@ import {
   FaTimes
 } from "react-icons/fa";
 import { getListing, getUserData, saveReview, getListingReviews, updateReview, updateListingRating, auth, db, validateCoupon, createBooking, addFavorite, removeFavorite, isFavorite } from "../../Config";
+import WishlistModal from "./WishlistModal";
 import { doc, deleteDoc } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import ListingMap from "./components/ListingMap";
@@ -102,6 +103,7 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
   const [isFavoriteListing, setIsFavoriteListing] = useState(false);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
   const [userId, setUserId] = useState(null);
+  const [showWishlistModal, setShowWishlistModal] = useState(false);
   const [bookingError, setBookingError] = useState("");
   const [bookingSuccess, setBookingSuccess] = useState("");
   const copyInputRef = useRef(null);
@@ -854,6 +856,11 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
       setExperienceGroupSize(1);
       setCouponCode("");
       setAppliedCoupon(null);
+      
+      // Show wishlist modal after successful booking
+      setTimeout(() => {
+        setShowWishlistModal(true);
+      }, 1000);
       
       setTimeout(() => {
         setBookingSuccess("");
@@ -2234,6 +2241,35 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
         aria-hidden="true"
         tabIndex={-1}
       />
+
+      {/* Wishlist Modal */}
+      {fullListingData && (
+        <WishlistModal
+          isOpen={showWishlistModal}
+          onClose={() => setShowWishlistModal(false)}
+          listingId={fullListingData.id}
+          listingTitle={fullListingData.title}
+          hostId={fullListingData.hostId}
+        />
+      )}
+
+    </div>
+  );
+};
+
+export default ListingDetail;
+
+
+      {/* Wishlist Modal */}
+      {fullListingData && (
+        <WishlistModal
+          isOpen={showWishlistModal}
+          onClose={() => setShowWishlistModal(false)}
+          listingId={fullListingData.id}
+          listingTitle={fullListingData.title}
+          hostId={fullListingData.hostId}
+        />
+      )}
 
     </div>
   );

@@ -492,6 +492,7 @@ const saveListing = async (hostId, listingData, isDraft = false) => {
             hostId: hostId,
             title: listingData.title || "",
             rate: listingData.rate || 0,
+            discount: listingData.discount || 0, // Discount percentage (0-100)
             promos: listingData.promos || [],
             images: listingData.images || [],
             location: listingData.location || {
@@ -1578,7 +1579,7 @@ export const withdrawFromWallet = async (userId, amount, paymentMethod = "paypal
         // DON'T deduct money yet - wait for admin approval
         // Just create a pending transaction record
         const transactionRef = collection(db, "transactions");
-        const transactionDoc = await addDoc(transactionRef, {
+        const transactionData = {
             userId,
             type: "withdrawal",
             amount,
@@ -1587,7 +1588,11 @@ export const withdrawFromWallet = async (userId, amount, paymentMethod = "paypal
             status: "pending", // Pending until admin approves
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
-        });
+        };
+        
+        console.log("Creating withdrawal transaction:", transactionData);
+        const transactionDoc = await addDoc(transactionRef, transactionData);
+        console.log("Withdrawal transaction created successfully with ID:", transactionDoc.id);
         
         // Return current balance (unchanged) and transaction ID
         return { success: true, newBalance: currentBalance, transactionId: transactionDoc.id };
@@ -2589,7 +2594,7 @@ export const getAllUsers = async () => {
 // Get all transactions (admin only)
 export const getAllTransactions = async () => {
     try {
-        const transactionsQuery = query(collection(db, "transactions"));
+        const transactionsQuery = query(collection(db, "transactions"), orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(transactionsQuery);
         const transactions = [];
         
@@ -2600,17 +2605,73 @@ export const getAllTransactions = async () => {
             });
         });
         
-        // Sort by date (newest first)
+        // Sort by date (newest first) - handle both createdAt and timestamp fields
         transactions.sort((a, b) => {
-            const dateA = a.timestamp?.toMillis() || 0;
-            const dateB = b.timestamp?.toMillis() || 0;
+            const getDate = (transaction) => {
+                if (transaction.createdAt?.toMillis) {
+                    return transaction.createdAt.toMillis();
+                }
+                if (transaction.createdAt?.seconds) {
+                    return transaction.createdAt.seconds * 1000;
+                }
+                if (transaction.timestamp?.toMillis) {
+                    return transaction.timestamp.toMillis();
+                }
+                if (transaction.timestamp?.seconds) {
+                    return transaction.timestamp.seconds * 1000;
+                }
+                return 0;
+            };
+            
+            const dateA = getDate(a);
+            const dateB = getDate(b);
             return dateB - dateA;
         });
         
         return transactions;
     } catch (error) {
         console.error("Error fetching all transactions:", error);
-        throw error;
+        // If orderBy fails (no index), try without orderBy
+        try {
+            const transactionsQuery = query(collection(db, "transactions"));
+            const querySnapshot = await getDocs(transactionsQuery);
+            const transactions = [];
+            
+            querySnapshot.forEach((doc) => {
+                transactions.push({
+                    id: doc.id,
+                    ...doc.data()
+                });
+            });
+            
+            // Sort by date (newest first) - handle both createdAt and timestamp fields
+            transactions.sort((a, b) => {
+                const getDate = (transaction) => {
+                    if (transaction.createdAt?.toMillis) {
+                        return transaction.createdAt.toMillis();
+                    }
+                    if (transaction.createdAt?.seconds) {
+                        return transaction.createdAt.seconds * 1000;
+                    }
+                    if (transaction.timestamp?.toMillis) {
+                        return transaction.timestamp.toMillis();
+                    }
+                    if (transaction.timestamp?.seconds) {
+                        return transaction.timestamp.seconds * 1000;
+                    }
+                    return 0;
+                };
+                
+                const dateA = getDate(a);
+                const dateB = getDate(b);
+                return dateB - dateA;
+            });
+            
+            return transactions;
+        } catch (fallbackError) {
+            console.error("Error fetching transactions (fallback):", fallbackError);
+            throw fallbackError;
+        }
     }
 };
 
@@ -3294,4 +3355,288 @@ export const getFeeStatistics = async () => {
     }
 };
 
+// Get all available coupons for guests (all active coupons from all hosts)
+export const getAllAvailableCoupons = async () => {
+    try {
+        const couponsRef = collection(db, "coupons");
+        const q = query(
+            couponsRef,
+            where("isActive", "==", true)
+        );
+        
+        const snapshot = await getDocs(q);
+        const now = new Date();
+        const coupons = [];
+        
+        snapshot.forEach((doc) => {
+            const coupon = {
+                id: doc.id,
+                ...doc.data()
+            };
+            
+            // Filter out expired coupons
+            if (coupon.expiresAt) {
+                const expiresAt = coupon.expiresAt.toDate ? coupon.expiresAt.toDate() : new Date(coupon.expiresAt);
+                if (expiresAt >= now) {
+                    coupons.push(coupon);
+                }
+            } else {
+                coupons.push(coupon);
+            }
+        });
+        
+        // Sort by createdAt descending (newest first)
+        coupons.sort((a, b) => {
+            const aTime = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
+            const bTime = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
+            return bTime - aTime;
+        });
+        
+        return coupons;
+    } catch (error) {
+        console.error("Error getting all available coupons:", error);
+        throw error;
+    }
+};
+
+// Create wishlist entry
+export const createWishlist = async (guestId, listingId, hostId, listingTitle, description) => {
+    try {
+        const wishlistRef = collection(db, "wishlists");
+        const wishlistData = {
+            guestId,
+            listingId,
+            hostId,
+            listingTitle,
+            description,
+            createdAt: serverTimestamp(),
+            status: "active"
+        };
+        
+        const docRef = await addDoc(wishlistRef, wishlistData);
+        return { id: docRef.id, ...wishlistData };
+    } catch (error) {
+        console.error("Error creating wishlist:", error);
+        throw error;
+    }
+};
+
+// Get wishlists for a host
+export const getHostWishlists = async (hostId) => {
+    try {
+        const wishlistsRef = collection(db, "wishlists");
+        const q = query(
+            wishlistsRef,
+            where("hostId", "==", hostId),
+            orderBy("createdAt", "desc")
+        );
+        
+        const snapshot = await getDocs(q);
+        const wishlists = [];
+        
+        snapshot.forEach((doc) => {
+            wishlists.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        
+        // Fetch guest data for each wishlist
+        const wishlistsWithGuestData = await Promise.all(
+            wishlists.map(async (wishlist) => {
+                try {
+                    const guestData = await getUserData(wishlist.guestId);
+                    return {
+                        ...wishlist,
+                        guestName: guestData?.Username || "Guest",
+                        guestAvatar: guestData?.ProfilePicture || null
+                    };
+                } catch (error) {
+                    console.error("Error fetching guest data for wishlist:", error);
+                    return {
+                        ...wishlist,
+                        guestName: "Guest",
+                        guestAvatar: null
+                    };
+                }
+            })
+        );
+        
+        return wishlistsWithGuestData;
+    } catch (error) {
+        console.error("Error getting host wishlists:", error);
+        throw error;
+    }
+};
+
+// Get wishlist by listing ID
+export const getWishlistByListing = async (listingId) => {
+    try {
+        const wishlistsRef = collection(db, "wishlists");
+        const q = query(
+            wishlistsRef,
+            where("listingId", "==", listingId),
+            orderBy("createdAt", "desc")
+        );
+        
+        const snapshot = await getDocs(q);
+        const wishlists = [];
+        
+        snapshot.forEach((doc) => {
+            wishlists.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        
+        return wishlists;
+    } catch (error) {
+        console.error("Error getting wishlist by listing:", error);
+        throw error;
+    }
+};
+
+export { auth, db, googleProvider, handleGoogleSignup, checkUserExists, checkAccountComplete, saveGoogleUserData, saveAdminUserData, saveHostUserData, getUserData, getUserDataByEmail, getUserType, updatePasswordInFirestore, verifyPassword, updateProfilePicture, updateUserProfile, updateUserType, linkEmailPasswordToGoogleAccount, saveListing, updateListing, getListing, deleteListing, getHostListings, getPublishedListings, saveReview, getListingReviews, updateListingRating, updateReview, getAllAvailableCoupons, createWishlist, getHostWishlists, getWishlistByListing };
+// Get all available coupons for guests (all active coupons from all hosts)
+export const getAllAvailableCoupons = async () => {
+    try {
+        const couponsRef = collection(db, "coupons");
+        const q = query(
+            couponsRef,
+            where("isActive", "==", true)
+        );
+        
+        const snapshot = await getDocs(q);
+        const now = new Date();
+        const coupons = [];
+        
+        snapshot.forEach((doc) => {
+            const coupon = {
+                id: doc.id,
+                ...doc.data()
+            };
+            
+            // Filter out expired coupons
+            if (coupon.expiresAt) {
+                const expiresAt = coupon.expiresAt.toDate ? coupon.expiresAt.toDate() : new Date(coupon.expiresAt);
+                if (expiresAt >= now) {
+                    coupons.push(coupon);
+                }
+            } else {
+                coupons.push(coupon);
+            }
+        });
+        
+        // Sort by createdAt descending (newest first)
+        coupons.sort((a, b) => {
+            const aTime = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(0);
+            const bTime = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(0);
+            return bTime - aTime;
+        });
+        
+        return coupons;
+    } catch (error) {
+        console.error("Error getting all available coupons:", error);
+        throw error;
+    }
+};
+
+// Create wishlist entry
+export const createWishlist = async (guestId, listingId, hostId, listingTitle, description) => {
+    try {
+        const wishlistRef = collection(db, "wishlists");
+        const wishlistData = {
+            guestId,
+            listingId,
+            hostId,
+            listingTitle,
+            description,
+            createdAt: serverTimestamp(),
+            status: "active"
+        };
+        
+        const docRef = await addDoc(wishlistRef, wishlistData);
+        return { id: docRef.id, ...wishlistData };
+    } catch (error) {
+        console.error("Error creating wishlist:", error);
+        throw error;
+    }
+};
+
+// Get wishlists for a host
+export const getHostWishlists = async (hostId) => {
+    try {
+        const wishlistsRef = collection(db, "wishlists");
+        const q = query(
+            wishlistsRef,
+            where("hostId", "==", hostId),
+            orderBy("createdAt", "desc")
+        );
+        
+        const snapshot = await getDocs(q);
+        const wishlists = [];
+        
+        snapshot.forEach((doc) => {
+            wishlists.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        
+        // Fetch guest data for each wishlist
+        const wishlistsWithGuestData = await Promise.all(
+            wishlists.map(async (wishlist) => {
+                try {
+                    const guestData = await getUserData(wishlist.guestId);
+                    return {
+                        ...wishlist,
+                        guestName: guestData?.Username || "Guest",
+                        guestAvatar: guestData?.ProfilePicture || null
+                    };
+                } catch (error) {
+                    console.error("Error fetching guest data for wishlist:", error);
+                    return {
+                        ...wishlist,
+                        guestName: "Guest",
+                        guestAvatar: null
+                    };
+                }
+            })
+        );
+        
+        return wishlistsWithGuestData;
+    } catch (error) {
+        console.error("Error getting host wishlists:", error);
+        throw error;
+    }
+};
+
+// Get wishlist by listing ID
+export const getWishlistByListing = async (listingId) => {
+    try {
+        const wishlistsRef = collection(db, "wishlists");
+        const q = query(
+            wishlistsRef,
+            where("listingId", "==", listingId),
+            orderBy("createdAt", "desc")
+        );
+        
+        const snapshot = await getDocs(q);
+        const wishlists = [];
+        
+        snapshot.forEach((doc) => {
+            wishlists.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        
+        return wishlists;
+    } catch (error) {
+        console.error("Error getting wishlist by listing:", error);
+        throw error;
+    }
+};
+
+export { auth, db, googleProvider, handleGoogleSignup, checkUserExists, checkAccountComplete, saveGoogleUserData, saveAdminUserData, saveHostUserData, getUserData, getUserDataByEmail, getUserType, updatePasswordInFirestore, verifyPassword, updateProfilePicture, updateUserProfile, updateUserType, linkEmailPasswordToGoogleAccount, saveListing, updateListing, getListing, deleteListing, getHostListings, getPublishedListings, saveReview, getListingReviews, updateListingRating, updateReview, getAllAvailableCoupons, createWishlist, getHostWishlists, getWishlistByListing };
 export { auth, db, googleProvider, handleGoogleSignup, checkUserExists, checkAccountComplete, saveGoogleUserData, saveAdminUserData, saveHostUserData, getUserData, getUserDataByEmail, getUserType, updatePasswordInFirestore, verifyPassword, updateProfilePicture, updateUserProfile, updateUserType, linkEmailPasswordToGoogleAccount, saveListing, updateListing, getListing, deleteListing, getHostListings, getPublishedListings, saveReview, getListingReviews, updateListingRating, updateReview };

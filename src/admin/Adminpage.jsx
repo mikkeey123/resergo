@@ -827,6 +827,218 @@ const Adminpage = () => {
         </div>
     );
 
+    // Transaction Table Component
+    const TransactionTable = ({ transactions, processingTransactionId, setProcessingTransactionId, setTransactionMessage, approveWithdrawal, rejectWithdrawal, getAllTransactions, setTransactions }) => {
+        const [transactionUsers, setTransactionUsers] = useState({});
+        const [loadingUsers, setLoadingUsers] = useState(true);
+
+        useEffect(() => {
+            const fetchUserData = async () => {
+                try {
+                    setLoadingUsers(true);
+                    const userMap = {};
+                    const uniqueUserIds = [...new Set(transactions.map(t => t.userId).filter(Boolean))];
+                    
+                    await Promise.all(uniqueUserIds.map(async (userId) => {
+                        try {
+                            const userData = await getUserData(userId);
+                            userMap[userId] = {
+                                username: userData?.Username || "Unknown User",
+                                userType: userData?.UserType || "N/A"
+                            };
+                        } catch (error) {
+                            userMap[userId] = {
+                                username: "Unknown User",
+                                userType: "N/A"
+                            };
+                        }
+                    }));
+                    
+                    setTransactionUsers(userMap);
+                } catch (error) {
+                    console.error("Error fetching user data:", error);
+                } finally {
+                    setLoadingUsers(false);
+                }
+            };
+
+            if (transactions.length > 0) {
+                fetchUserData();
+            }
+        }, [transactions]);
+
+        return (
+            <div className="overflow-x-auto">
+                <table className="w-full">
+                    <thead>
+                        <tr className="border-b border-gray-200">
+                            <th className="text-left py-3 px-4 text-gray-700 font-semibold">Username</th>
+                            <th className="text-left py-3 px-4 text-gray-700 font-semibold">User Type</th>
+                            <th className="text-left py-3 px-4 text-gray-700 font-semibold">Type</th>
+                            <th className="text-left py-3 px-4 text-gray-700 font-semibold">Amount</th>
+                            <th className="text-left py-3 px-4 text-gray-700 font-semibold">Status</th>
+                            <th className="text-left py-3 px-4 text-gray-700 font-semibold">Date</th>
+                            <th className="text-left py-3 px-4 text-gray-700 font-semibold">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {loadingUsers ? (
+                            <tr>
+                                <td colSpan="7" className="py-8 text-center text-gray-500">Loading user data...</td>
+                            </tr>
+                        ) : transactions.length === 0 ? (
+                            <tr>
+                                <td colSpan="7" className="py-8 text-center text-gray-500">No transactions found.</td>
+                            </tr>
+                        ) : (
+                            transactions.map((transaction) => {
+                                const userInfo = transactionUsers[transaction.userId] || { username: "Loading...", userType: "N/A" };
+                                return (
+                                    <tr key={transaction.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                        <td className="py-3 px-4 text-gray-900 font-medium">{userInfo.username}</td>
+                                        <td className="py-3 px-4 text-gray-700 capitalize">{userInfo.userType}</td>
+                                        <td className="py-3 px-4 text-gray-700 capitalize">{transaction.type || "N/A"}</td>
+                                        <td className="py-3 px-4 text-gray-900 font-semibold">
+                                            ₱{(transaction.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="py-3 px-4">
+                                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                                transaction.status === "completed"
+                                                    ? "bg-green-100 text-green-700 border border-green-300"
+                                                    : transaction.status === "pending"
+                                                    ? "bg-yellow-100 text-yellow-700 border border-yellow-300"
+                                                    : "bg-red-100 text-red-700 border border-red-300"
+                                            }`}>
+                                                {transaction.status || "N/A"}
+                                            </span>
+                                        </td>
+                                        <td className="py-3 px-4 text-gray-700">
+                                            {transaction.timestamp?.toDate ? transaction.timestamp.toDate().toLocaleDateString() : 
+                                             transaction.createdAt?.toDate ? transaction.createdAt.toDate().toLocaleDateString() : "N/A"}
+                                        </td>
+                                        <td className="py-3 px-4">
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded transition"
+                                                    title="View Details"
+                                                >
+                                                    <FaEye />
+                                                </button>
+                                                {transaction.status === "pending" && transaction.type === "withdrawal" && (
+                                                    <>
+                                                        <button
+                                                            onClick={async () => {
+                                                                const amount = (transaction.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                                                const confirmMessage = `Are you sure you want to approve this withdrawal?\n\nAmount: ₱${amount}\nUsername: ${userInfo.username || 'N/A'}\n\nThis will deduct the amount from the user's wallet.`;
+                                                                
+                                                                if (window.confirm(confirmMessage)) {
+                                                                    setProcessingTransactionId(transaction.id);
+                                                                    setTransactionMessage({ type: '', text: '' });
+                                                                    
+                                                                    try {
+                                                                        const result = await approveWithdrawal(transaction.id);
+                                                                        setTransactionMessage({ 
+                                                                            type: 'success', 
+                                                                            text: `Withdrawal approved successfully! New wallet balance: ₱${(result.newBalance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
+                                                                        });
+                                                                        
+                                                                        // Reload transactions after a short delay
+                                                                        setTimeout(async () => {
+                                                                            const transactionsData = await getAllTransactions();
+                                                                            setTransactions(transactionsData);
+                                                                            setTransactionMessage({ type: '', text: '' });
+                                                                        }, 1500);
+                                                                    } catch (error) {
+                                                                        console.error("Error approving withdrawal:", error);
+                                                                        setTransactionMessage({ 
+                                                                            type: 'error', 
+                                                                            text: error.message || "Failed to approve withdrawal. Please check the console for details." 
+                                                                        });
+                                                                        setTimeout(() => {
+                                                                            setTransactionMessage({ type: '', text: '' });
+                                                                        }, 5000);
+                                                                    } finally {
+                                                                        setProcessingTransactionId(null);
+                                                                    }
+                                                                }
+                                                            }}
+                                                            disabled={processingTransactionId === transaction.id}
+                                                            className={`p-2 text-green-600 hover:bg-green-50 rounded transition ${
+                                                                processingTransactionId === transaction.id ? 'opacity-50 cursor-not-allowed' : ''
+                                                            }`}
+                                                            title="Approve Withdrawal"
+                                                        >
+                                                            {processingTransactionId === transaction.id ? (
+                                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+                                                            ) : (
+                                                                <FaCheckCircle />
+                                                            )}
+                                                        </button>
+                                                        <button
+                                                            onClick={async () => {
+                                                                const amount = (transaction.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                                                const confirmMessage = `Are you sure you want to reject this withdrawal?\n\nAmount: ₱${amount}\nUsername: ${userInfo.username || 'N/A'}\n\nThe user's wallet balance will remain unchanged.`;
+                                                                
+                                                                if (window.confirm(confirmMessage)) {
+                                                                    const reason = window.prompt("Enter rejection reason (optional):\n\nLeave empty for default reason.");
+                                                                    if (reason !== null) { // User didn't cancel
+                                                                        setProcessingTransactionId(transaction.id);
+                                                                        setTransactionMessage({ type: '', text: '' });
+                                                                        
+                                                                        try {
+                                                                            await rejectWithdrawal(transaction.id, reason || "");
+                                                                            setTransactionMessage({ 
+                                                                                type: 'success', 
+                                                                                text: "Withdrawal rejected successfully!" 
+                                                                            });
+                                                                            
+                                                                            // Reload transactions after a short delay
+                                                                            setTimeout(async () => {
+                                                                                const transactionsData = await getAllTransactions();
+                                                                                setTransactions(transactionsData);
+                                                                                setTransactionMessage({ type: '', text: '' });
+                                                                            }, 1500);
+                                                                        } catch (error) {
+                                                                            console.error("Error rejecting withdrawal:", error);
+                                                                            setTransactionMessage({ 
+                                                                                type: 'error', 
+                                                                                text: error.message || "Failed to reject withdrawal. Please check the console for details." 
+                                                                            });
+                                                                            setTimeout(() => {
+                                                                                setTransactionMessage({ type: '', text: '' });
+                                                                            }, 5000);
+                                                                        } finally {
+                                                                            setProcessingTransactionId(null);
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }}
+                                                            disabled={processingTransactionId === transaction.id}
+                                                            className={`p-2 text-red-600 hover:bg-red-50 rounded transition ${
+                                                                processingTransactionId === transaction.id ? 'opacity-50 cursor-not-allowed' : ''
+                                                            }`}
+                                                            title="Reject Withdrawal"
+                                                        >
+                                                            {processingTransactionId === transaction.id ? (
+                                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
+                                                            ) : (
+                                                                <FaTimesCircle />
+                                                            )}
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        );
+    };
+
     return (
         <div className="flex h-screen bg-gray-100 overflow-hidden">
             {/* Mobile Overlay */}
@@ -1715,159 +1927,115 @@ const Adminpage = () => {
                                 {transactions.length === 0 ? (
                                     <p className="text-center py-8 text-gray-500">No transactions to review.</p>
                                 ) : (
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full">
-                                            <thead>
-                                                <tr className="border-b border-gray-200">
-                                                    <th className="text-left py-3 px-4 text-gray-700 font-semibold">User</th>
-                                                    <th className="text-left py-3 px-4 text-gray-700 font-semibold">Type</th>
-                                                    <th className="text-left py-3 px-4 text-gray-700 font-semibold">Amount</th>
-                                                    <th className="text-left py-3 px-4 text-gray-700 font-semibold">Status</th>
-                                                    <th className="text-left py-3 px-4 text-gray-700 font-semibold">Date</th>
-                                                    <th className="text-left py-3 px-4 text-gray-700 font-semibold">Actions</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {transactions.slice(0, 50).map((transaction) => (
-                                                    <tr key={transaction.id} className="border-b border-gray-100 hover:bg-gray-50">
-                                                        <td className="py-3 px-4 text-gray-900 font-medium">{transaction.userId || "N/A"}</td>
-                                                        <td className="py-3 px-4 text-gray-700 capitalize">{transaction.type || "N/A"}</td>
-                                                        <td className="py-3 px-4 text-gray-900 font-semibold">
-                                                            ₱{(transaction.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                        </td>
-                                                        <td className="py-3 px-4">
-                                                            <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                                                transaction.status === "completed"
-                                                                    ? "bg-green-100 text-green-700 border border-green-300"
-                                                                    : transaction.status === "pending"
-                                                                    ? "bg-yellow-100 text-yellow-700 border border-yellow-300"
-                                                                    : "bg-red-100 text-red-700 border border-red-300"
-                                                            }`}>
-                                                                {transaction.status || "N/A"}
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-3 px-4 text-gray-700">
-                                                            {transaction.timestamp?.toDate().toLocaleDateString() || "N/A"}
-                                                        </td>
-                                                        <td className="py-3 px-4">
-                                                            <div className="flex items-center gap-2">
-                                                                <button
-                                                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded transition"
-                                                                    title="View Details"
-                                                                >
-                                                                    <FaEye />
-                                                                </button>
-                                                                {transaction.status === "pending" && transaction.type === "withdrawal" && (
-                                                                    <>
-                                                                        <button
-                                                                            onClick={async () => {
-                                                                                const amount = (transaction.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                                                                                const confirmMessage = `Are you sure you want to approve this withdrawal?\n\nAmount: ₱${amount}\nUser ID: ${transaction.userId || 'N/A'}\n\nThis will deduct the amount from the user's wallet.`;
-                                                                                
-                                                                                if (window.confirm(confirmMessage)) {
-                                                                                    setProcessingTransactionId(transaction.id);
-                                                                                    setTransactionMessage({ type: '', text: '' });
-                                                                                    
-                                                                                    try {
-                                                                                        const result = await approveWithdrawal(transaction.id);
-                                                                                        setTransactionMessage({ 
-                                                                                            type: 'success', 
-                                                                                            text: `Withdrawal approved successfully! New wallet balance: ₱${(result.newBalance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
-                                                                                        });
-                                                                                        
-                                                                                        // Reload transactions after a short delay
-                                                                                        setTimeout(async () => {
-                                                                                            const transactionsData = await getAllTransactions();
-                                                                                            setTransactions(transactionsData);
-                                                                                            setTransactionMessage({ type: '', text: '' });
-                                                                                        }, 1500);
-                                                                                    } catch (error) {
-                                                                                        console.error("Error approving withdrawal:", error);
-                                                                                        setTransactionMessage({ 
-                                                                                            type: 'error', 
-                                                                                            text: error.message || "Failed to approve withdrawal. Please check the console for details." 
-                                                                                        });
-                                                                                        setTimeout(() => {
-                                                                                            setTransactionMessage({ type: '', text: '' });
-                                                                                        }, 5000);
-                                                                                    } finally {
-                                                                                        setProcessingTransactionId(null);
-                                                                                    }
-                                                                                }
-                                                                            }}
-                                                                            disabled={processingTransactionId === transaction.id}
-                                                                            className={`p-2 text-green-600 hover:bg-green-50 rounded transition ${
-                                                                                processingTransactionId === transaction.id ? 'opacity-50 cursor-not-allowed' : ''
-                                                                            }`}
-                                                                            title="Approve Withdrawal"
-                                                                        >
-                                                                            {processingTransactionId === transaction.id ? (
-                                                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
-                                                                            ) : (
-                                                                                <FaCheckCircle />
-                                                                            )}
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={async () => {
-                                                                                const amount = (transaction.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                                                                                const confirmMessage = `Are you sure you want to reject this withdrawal?\n\nAmount: ₱${amount}\nUser ID: ${transaction.userId || 'N/A'}\n\nThe user's wallet balance will remain unchanged.`;
-                                                                                
-                                                                                if (window.confirm(confirmMessage)) {
-                                                                                    const reason = window.prompt("Enter rejection reason (optional):\n\nLeave empty for default reason.");
-                                                                                    if (reason !== null) { // User didn't cancel
-                                                                                        setProcessingTransactionId(transaction.id);
-                                                                                        setTransactionMessage({ type: '', text: '' });
-                                                                                        
-                                                                                        try {
-                                                                                            await rejectWithdrawal(transaction.id, reason || "");
-                                                                                            setTransactionMessage({ 
-                                                                                                type: 'success', 
-                                                                                                text: "Withdrawal rejected successfully!" 
-                                                                                            });
-                                                                                            
-                                                                                            // Reload transactions after a short delay
-                                                                                            setTimeout(async () => {
-                                                                                                const transactionsData = await getAllTransactions();
-                                                                                                setTransactions(transactionsData);
-                                                                                                setTransactionMessage({ type: '', text: '' });
-                                                                                            }, 1500);
-                                                                                        } catch (error) {
-                                                                                            console.error("Error rejecting withdrawal:", error);
-                                                                                            setTransactionMessage({ 
-                                                                                                type: 'error', 
-                                                                                                text: error.message || "Failed to reject withdrawal. Please check the console for details." 
-                                                                                            });
-                                                                                            setTimeout(() => {
-                                                                                                setTransactionMessage({ type: '', text: '' });
-                                                                                            }, 5000);
-                                                                                        } finally {
-                                                                                            setProcessingTransactionId(null);
-                                                                                        }
-                                                                                    }
-                                                                                }
-                                                                            }}
-                                                                            disabled={processingTransactionId === transaction.id}
-                                                                            className={`p-2 text-red-600 hover:bg-red-50 rounded transition ${
-                                                                                processingTransactionId === transaction.id ? 'opacity-50 cursor-not-allowed' : ''
-                                                                            }`}
-                                                                            title="Reject Withdrawal"
-                                                                        >
-                                                                            {processingTransactionId === transaction.id ? (
-                                                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600"></div>
-                                                                            ) : (
-                                                                                <FaTimesCircle />
-                                                                            )}
-                                                                        </button>
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                                    <TransactionTable transactions={transactions} 
+                                        processingTransactionId={processingTransactionId}
+                                        setProcessingTransactionId={setProcessingTransactionId}
+                                        setTransactionMessage={setTransactionMessage}
+                                        approveWithdrawal={approveWithdrawal}
+                                        rejectWithdrawal={rejectWithdrawal}
+                                        getAllTransactions={getAllTransactions}
+                                        setTransactions={setTransactions}
+                                    />
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Service Fees Tab */}
+                    {activeTab === "serviceFees" && (
+                        <div className="space-y-6">
+                            {/* Platform Fee Configuration */}
+                            <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <FaCog className="text-purple-600 text-2xl" />
+                                        <div>
+                                            <h2 className="text-xl font-semibold text-gray-900">Platform Fee Configuration</h2>
+                                            <p className="text-sm text-gray-600">Set the percentage of booking revenue that goes to the platform</p>
+                                        </div>
+                                    </div>
+                                    {!editingFee && (
+                                        <button
+                                            onClick={() => setEditingFee(true)}
+                                            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+                                        >
+                                            <FaEdit />
+                                            <span>Edit Percentage</span>
+                                        </button>
+                                    )}
+                                </div>
+
+                                {editingFee ? (
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-4">
+                                            <label className="text-sm font-medium text-gray-700">Platform Fee Percentage:</label>
+                                            <input
+                                                type="number"
+                                                value={platformFeePercentage}
+                                                onChange={(e) => {
+                                                    const value = parseFloat(e.target.value) || 0;
+                                                    setPlatformFeePercentage(value);
+                                                    setHostSharePercentage(100 - value);
+                                                }}
+                                                min="0"
+                                                max="100"
+                                                step="0.1"
+                                                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 w-32"
+                                            />
+                                            <span className="text-gray-600">%</span>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <label className="text-sm font-medium text-gray-700">Host Share Percentage:</label>
+                                            <input
+                                                type="number"
+                                                value={hostSharePercentage}
+                                                readOnly
+                                                className="px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 w-32"
+                                            />
+                                            <span className="text-gray-600">%</span>
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <button
+                                                onClick={async () => {
+                                                    try {
+                                                        await savePlatformFeePercentage(platformFeePercentage);
+                                                        setEditingFee(false);
+                                                        alert("Platform fee percentage updated successfully!");
+                                                    } catch (error) {
+                                                        console.error("Error saving platform fee:", error);
+                                                        alert("Failed to save platform fee. Please try again.");
+                                                    }
+                                                }}
+                                                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition flex items-center gap-2"
+                                            >
+                                                <FaSave />
+                                                <span>Save</span>
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setEditingFee(false);
+                                                    // Reset to original values
+                                                    fetchServiceFeesData();
+                                                }}
+                                                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-4">
+                                            <span className="text-sm font-medium text-gray-700">Platform Fee:</span>
+                                            <span className="text-2xl font-bold text-purple-600">{platformFeePercentage}%</span>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <span className="text-sm font-medium text-gray-700">Host Share:</span>
+                                            <span className="text-2xl font-bold text-green-600">{hostSharePercentage}%</span>
+                                        </div>
                                     </div>
                                 )}
+                            </div>
                             </div>
                         </div>
                     )}
@@ -2131,6 +2299,37 @@ const Adminpage = () => {
                                                             </span>
                                                         </td>
                                                     </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Account Settings Tab */}
+                    {activeTab === "settings" && (
+                        <UserDetails 
+                            onBack={async () => {
+                                const user = auth.currentUser;
+                                if (user) {
+                                    await fetchUserData(user);
+                                }
+                                setActiveTab("analytics");
+                            }}
+                            hideBackButton={true}
+                            isHostPage={false}
+                        />
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default Adminpage;
+
                                                 ))}
                                             </tbody>
                                         </table>

@@ -150,6 +150,8 @@ const Body = ({ activeSelection, showDynamicSection = true, onListingClick, sear
                         id: listing.id,
                         title: listing.title || "Untitled Listing",
                         price: listing.rate || 0,
+                        discountedPrice: listing.discount > 0 ? (listing.rate || 0) * (1 - (listing.discount || 0) / 100) : listing.rate || 0,
+                        discount: listing.discount || 0,
                         rating: listing.rating || null,
                         image: imageUrl,
                         photos: listing.images || [],
@@ -370,7 +372,17 @@ const Body = ({ activeSelection, showDynamicSection = true, onListingClick, sear
                     </div>
                     {/* Price, Rating, and Max Guests */}
                     <div className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-900 flex-wrap">
-                        <span>₱{listing.price.toLocaleString()}</span>
+                        {listing.discount > 0 && listing.discountedPrice ? (
+                            <>
+                                <span className="line-through text-gray-400">₱{listing.price.toLocaleString()}</span>
+                                <span className="text-red-600 font-semibold">₱{listing.discountedPrice.toLocaleString()}</span>
+                                <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-medium">
+                                    -{listing.discount}%
+                                </span>
+                            </>
+                        ) : (
+                            <span>₱{listing.price.toLocaleString()}</span>
+                        )}
                         {listing.rating !== null && listing.rating > 0 && (
                             <>
                                 <span>•</span>
@@ -468,3 +480,15 @@ const Body = ({ activeSelection, showDynamicSection = true, onListingClick, sear
 };
 
 export default Body;
+                            })}
+                        </div>
+                    )}
+                </div>
+
+            </div>
+        </div>
+    );
+};
+
+export default Body;
+

@@ -7,6 +7,7 @@ import Favorites from "./Favorites";
 import MessagesPage from "./MessagesPage";
 import Payments from "./Payments";
 import Bookings from "./Bookings";
+import Coupons from "./Coupons";
 import { getListing } from "../../Config";
 
 const Guestpage = ({ currentView = "listings", onBackToListings, onNavigateToMessages, searchFilters = {}, onSearchFilters }) => {
@@ -124,6 +125,11 @@ const Guestpage = ({ currentView = "listings", onBackToListings, onNavigateToMes
         return <Bookings onBack={onBackToListings} />;
     }
 
+    // Show coupons page if currentView is "coupons"
+    if (currentView === "coupons") {
+        return <Coupons />;
+    }
+
     // If a listing is selected, show the detail view
     if (selectedListing) {
         console.log("Rendering ListingDetail with listing:", selectedListing);
@@ -151,4 +157,10 @@ const Guestpage = ({ currentView = "listings", onBackToListings, onNavigateToMes
 };
 
 export default Guestpage;
+
+    );
+};
+
+export default Guestpage;
+
 

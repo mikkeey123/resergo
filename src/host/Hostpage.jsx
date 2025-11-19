@@ -30,6 +30,7 @@ import Coupons from "./Coupons";
 import PaymentMethods from "./PaymentMethods";
 import PointsRewards from "./PointsRewards";
 import UserDetails from "../components/UserDetails";
+import Wishlists from "./Wishlists";
 import { auth, getUserData, getUserType, getUnreadMessageCount, getHostBookings, getHostListings, getWalletBalance } from "../../Config";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import logo from "../assets/logo.png";
@@ -57,6 +58,7 @@ const Hostpage = () => {
         pendingBookings: 0
     });
     const [loadingDashboard, setLoadingDashboard] = useState(true);
+    const [tabRefreshKey, setTabRefreshKey] = useState({});
 
     // Function to fetch and update user data
     const fetchUserData = async (user) => {
@@ -196,12 +198,12 @@ const Hostpage = () => {
         }
     };
 
-    // Fetch dashboard data when tab is active
+    // Fetch dashboard data when tab is active or refresh key changes
     useEffect(() => {
         if (activeTab === "dashboard") {
             fetchDashboardData();
         }
-    }, [activeTab]);
+    }, [activeTab, tabRefreshKey.dashboard]);
 
     // Filter bookings by date
     const today = new Date();
@@ -240,6 +242,7 @@ const Hostpage = () => {
         { id: "calendar", label: "Calendar", icon: <FaCalendarAlt /> },
         { id: "bookings", label: "Bookings", icon: <FaCalendar /> },
         { id: "coupons", label: "Coupons", icon: <FaTicketAlt /> },
+        { id: "wishlists", label: "Wishlists", icon: <FaGift /> },
         { id: "payments", label: "E-Wallet", icon: <FaCreditCard /> },
         { id: "rewards", label: "Points and Rewards", icon: <FaGift /> },
         { id: "settings", label: "Account", icon: <FaUser /> },
@@ -306,7 +309,14 @@ const Hostpage = () => {
                         return (
                             <button
                                 key={item.id}
-                                onClick={() => setActiveTab(item.id)}
+                                onClick={() => {
+                                    setActiveTab(item.id);
+                                    // Trigger refresh for this tab
+                                    setTabRefreshKey(prev => ({
+                                        ...prev,
+                                        [item.id]: Date.now()
+                                    }));
+                                }}
                                 className={`w-full flex items-center py-3 rounded-xl transition-all duration-200 ease-in-out relative ${
                                     sidebarOpen ? 'gap-3 px-4' : 'justify-center px-2'
                                 } ${
@@ -386,6 +396,7 @@ const Hostpage = () => {
                              activeTab === "calendar" ? "Calendar" :
                              activeTab === "bookings" ? "Bookings" :
                              activeTab === "coupons" ? "Coupons" :
+                             activeTab === "wishlists" ? "Wishlists" :
                              activeTab === "payments" ? "E-Wallet" :
                              activeTab === "rewards" ? "Points and Rewards" :
                              activeTab === "settings" ? "Account" : "Dashboard"}
@@ -687,19 +698,21 @@ const Hostpage = () => {
                         </div>
                     )}
 
-                    {activeTab === "listings" && <Listings />}
+                    {activeTab === "listings" && <Listings key={`listings-${tabRefreshKey.listings || 0}`} />}
 
-                    {activeTab === "messages" && <Messages />}
+                    {activeTab === "messages" && <Messages key={`messages-${tabRefreshKey.messages || 0}`} />}
 
-                    {activeTab === "calendar" && <Calendar />}
+                    {activeTab === "calendar" && <Calendar key={`calendar-${tabRefreshKey.calendar || 0}`} />}
 
-                    {activeTab === "bookings" && <Bookings />}
+                    {activeTab === "bookings" && <Bookings key={`bookings-${tabRefreshKey.bookings || 0}`} />}
 
-                    {activeTab === "coupons" && <Coupons />}
+                    {activeTab === "coupons" && <Coupons key={`coupons-${tabRefreshKey.coupons || 0}`} />}
 
-                    {activeTab === "payments" && <PaymentMethods />}
+                    {activeTab === "wishlists" && <Wishlists key={`wishlists-${tabRefreshKey.wishlists || 0}`} />}
 
-                    {activeTab === "rewards" && <PointsRewards />}
+                    {activeTab === "payments" && <PaymentMethods key={`payments-${tabRefreshKey.payments || 0}`} />}
+
+                    {activeTab === "rewards" && <PointsRewards key={`rewards-${tabRefreshKey.rewards || 0}`} />}
 
                     {activeTab === "settings" && (
                         <UserDetails 
@@ -723,3 +736,5 @@ const Hostpage = () => {
 };
 
 export default Hostpage;
+export default Hostpage;
+

@@ -38,9 +38,10 @@ service cloud.firestore {
     
     // Listings collection
     match /listings/{listingId} {
-      // Allow anyone to read published listings (not drafts)
+      // Allow anyone to read published listings (not drafts), hosts can read their own, admins can read all
       allow read: if resource.data.isDraft == false || 
-                     (isAuthenticated() && resource.data.hostId == request.auth.uid);
+                     (isAuthenticated() && resource.data.hostId == request.auth.uid) ||
+                     isAdmin();
       
       // Allow hosts to create listings
       allow create: if isHost() && 
@@ -48,6 +49,7 @@ service cloud.firestore {
       
       // Allow hosts to update their own listings
       // Also allow authenticated users to update rating-related fields (for review system)
+      // Admins can update any listing
       allow update: if (isHost() && 
                        resource.data.hostId == request.auth.uid &&
                        request.resource.data.hostId == request.auth.uid) ||
@@ -56,16 +58,18 @@ service cloud.firestore {
                        request.resource.data.hostId == resource.data.hostId &&
                        request.resource.data.title == resource.data.title &&
                        request.resource.data.rate == resource.data.rate &&
-                       request.resource.data.isDraft == resource.data.isDraft);
+                       request.resource.data.isDraft == resource.data.isDraft) ||
+                     isAdmin();
       
-      // Allow hosts to delete their own listings
-      allow delete: if isHost() && 
-                       resource.data.hostId == request.auth.uid;
+      // Allow hosts to delete their own listings, admins can delete any listing
+      allow delete: if (isHost() && 
+                       resource.data.hostId == request.auth.uid) ||
+                     isAdmin();
     }
     
     // Reviews collection - for guest comments/reviews
     match /reviews/{reviewId} {
-      // Anyone can read reviews for published listings
+      // Anyone authenticated can read reviews (admins included)
       allow read: if isAuthenticated();
       
       // Authenticated users can create reviews (comments)
@@ -73,14 +77,16 @@ service cloud.firestore {
       allow create: if isAuthenticated() && 
                        request.resource.data.guestId == request.auth.uid;
       
-      // Users can only update their own reviews
-      allow update: if isAuthenticated() && 
+      // Users can only update their own reviews, admins can update any review
+      allow update: if (isAuthenticated() && 
                        resource.data.guestId == request.auth.uid &&
-                       request.resource.data.guestId == request.auth.uid;
+                       request.resource.data.guestId == request.auth.uid) ||
+                     isAdmin();
       
-      // Users can only delete their own reviews
-      allow delete: if isAuthenticated() && 
-                       resource.data.guestId == request.auth.uid;
+      // Users can only delete their own reviews, admins can delete any review
+      allow delete: if (isAuthenticated() && 
+                       resource.data.guestId == request.auth.uid) ||
+                     isAdmin();
     }
     
     // Favorites collection - for user's favorite listings
@@ -208,7 +214,7 @@ service cloud.firestore {
     
     // Coupons collection - for discount coupons
     match /coupons/{couponId} {
-      // Anyone authenticated can read coupons
+      // Anyone authenticated can read coupons (admins included)
       allow read: if isAuthenticated();
       
       // Only hosts can create coupons for their own listings
@@ -222,6 +228,77 @@ service cloud.firestore {
       // Hosts can delete their own coupons, admins can delete any coupon
       allow delete: if (isHost() && 
                        resource.data.hostId == request.auth.uid) || isAdmin();
+    }
+    
+    // Wishlists collection - for guest wishlists
+    match /wishlists/{wishlistId} {
+      // Hosts can read wishlists for their listings, guests can read their own, admins can read all
+      allow read: if (isAuthenticated() && 
+                       (resource.data.hostId == request.auth.uid || 
+                        resource.data.guestId == request.auth.uid)) ||
+                     isAdmin();
+      
+      // Guests can create wishlists for themselves
+      allow create: if isAuthenticated() && 
+                       request.resource.data.guestId == request.auth.uid;
+      
+      // Guests can update their own wishlists, admins can update any wishlist
+      allow update: if (isAuthenticated() && 
+                       resource.data.guestId == request.auth.uid) ||
+                     isAdmin();
+      
+      // Guests can delete their own wishlists, admins can delete any wishlist
+      allow delete: if (isAuthenticated() && 
+                       resource.data.guestId == request.auth.uid) ||
+                     isAdmin();
+    }
+    
+    // Platform Settings collection - for admin platform configuration
+    match /platformSettings/{documentId} {
+      // Anyone authenticated can read platform settings (for displaying terms, policies, etc.)
+      // Admins have full access
+      allow read: if isAuthenticated();
+      
+      // Only admins can create/update platform settings
+      allow write: if isAdmin();
+    }
+    
+    // Points Transactions collection - for host points system
+    match /pointsTransactions/{transactionId} {
+      // Hosts can read their own points transactions, admins can read all
+      allow read: if (isAuthenticated() && 
+                       resource.data.hostId == request.auth.uid) ||
+                     isAdmin();
+      
+      // System can create points transactions (hosts earn/redeem points)
+      allow create: if isAuthenticated() && 
+                       request.resource.data.hostId == request.auth.uid;
+      
+      // Only admins can update/delete points transactions
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+    
+    // Host Rewards collection - for host rewards system
+    match /hostRewards/{rewardId} {
+      // Hosts can read their own rewards, admins can read all
+      allow read: if (isAuthenticated() && 
+                       resource.data.hostId == request.auth.uid) ||
+                     isAdmin();
+      
+      // Hosts can create rewards for themselves (when redeeming points)
+      allow create: if isAuthenticated() && 
+                       request.resource.data.hostId == request.auth.uid;
+      
+      // Hosts can update their own rewards, admins can update any reward
+      allow update: if (isAuthenticated() && 
+                       resource.data.hostId == request.auth.uid) ||
+                     isAdmin();
+      
+      // Hosts can delete their own rewards, admins can delete any reward
+      allow delete: if (isAuthenticated() && 
+                       resource.data.hostId == request.auth.uid) ||
+                     isAdmin();
     }
   }
 }
