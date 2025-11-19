@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
-import { FaImage, FaHeart, FaRegHeart, FaStar } from "react-icons/fa";
-import { getPublishedListings, auth, getFavorites, addFavorite, removeFavorite } from "../../Config";
+import { FaImage, FaHeart, FaRegHeart, FaStar, FaUser } from "react-icons/fa";
+import { getPublishedListings, auth, getFavorites, addFavorite, removeFavorite, getUserData } from "../../Config";
 import { onAuthStateChanged } from "firebase/auth";
 
 const Services = ({ onListingClick }) => {
@@ -68,8 +68,9 @@ const Services = ({ onListingClick }) => {
                 setLoading(true);
                 const publishedListings = await getPublishedListings("Service");
                 
-                // Transform Firestore listings to component format
-                const transformedServices = publishedListings.map(listing => {
+                // Transform Firestore listings to component format with host data
+                const transformedServices = await Promise.all(
+                    publishedListings.map(async (listing) => {
                     // Get first image, ensure it's a valid Base64 data URL
                     let imageUrl = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect width='400' height='300' fill='%23f3f4f6'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='18' fill='%239ca3af'%3ENo Image%3C/text%3E%3C/svg%3E";
                     
@@ -111,7 +112,7 @@ const Services = ({ onListingClick }) => {
                     };
                 });
                 
-                setServices(transformedServices);
+                setServices(servicesWithHostData);
             } catch (error) {
                 console.error("Error fetching services:", error);
                 setServices([]);
@@ -327,6 +328,29 @@ const Services = ({ onListingClick }) => {
                     <h3 className="font-semibold text-gray-900 mb-1 line-clamp-1 text-sm sm:text-base">
                         {listing.title}
                     </h3>
+                    {/* Host Information */}
+                    {listing.hostName && (
+                        <div className="flex items-center gap-1.5 text-xs text-gray-600 mb-1">
+                            <FaUser className="text-xs" />
+                            <div className="flex items-center gap-1.5">
+                                {listing.hostAvatar ? (
+                                    <img 
+                                        src={listing.hostAvatar} 
+                                        alt={listing.hostName}
+                                        className="w-4 h-4 rounded-full object-cover"
+                                        onError={(e) => {
+                                            e.target.style.display = 'none';
+                                        }}
+                                    />
+                                ) : (
+                                    <div className="w-4 h-4 rounded-full bg-gray-200 flex items-center justify-center">
+                                        <FaUser className="text-gray-500 text-xs" />
+                                    </div>
+                                )}
+                                <span className="line-clamp-1">{listing.hostName}</span>
+                            </div>
+                        </div>
+                    )}
                     <div className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-900 flex-wrap">
                         {listing.discount > 0 && listing.discountedPrice ? (
                             <>

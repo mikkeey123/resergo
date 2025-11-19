@@ -1,9 +1,9 @@
 import React, { useState, useCallback, useRef, useEffect } from "react";
-import { FaImage, FaHeart, FaRegHeart, FaStar, FaMapMarkerAlt, FaUsers } from "react-icons/fa";
+import { FaImage, FaHeart, FaRegHeart, FaStar, FaMapMarkerAlt, FaUsers, FaUser } from "react-icons/fa";
 import Home from "./Home";
 import Expiriences from "./Expiriences";
 import Services from "./Services";
-import { getPublishedListings, auth, getFavorites, addFavorite, removeFavorite, getRecommendations } from "../../Config";
+import { getPublishedListings, auth, getFavorites, addFavorite, removeFavorite, getRecommendations, getUserData } from "../../Config";
 import { onAuthStateChanged } from "firebase/auth";
 
 const Body = ({ activeSelection, showDynamicSection = true, onListingClick, searchFilters = {}, showSuggestions = false, customTitle = "Suggestions & Recommendations" }) => {
@@ -370,6 +370,29 @@ const Body = ({ activeSelection, showDynamicSection = true, onListingClick, sear
                         <FaMapMarkerAlt className="text-xs" />
                         <span className="line-clamp-1">{listing.location}</span>
                     </div>
+                    {/* Host Information */}
+                    {listing.hostName && (
+                        <div className="flex items-center gap-1.5 text-xs text-gray-600 mb-1">
+                            <FaUser className="text-xs" />
+                            <div className="flex items-center gap-1.5">
+                                {listing.hostAvatar ? (
+                                    <img 
+                                        src={listing.hostAvatar} 
+                                        alt={listing.hostName}
+                                        className="w-4 h-4 rounded-full object-cover"
+                                        onError={(e) => {
+                                            e.target.style.display = 'none';
+                                        }}
+                                    />
+                                ) : (
+                                    <div className="w-4 h-4 rounded-full bg-gray-200 flex items-center justify-center">
+                                        <FaUser className="text-gray-500 text-xs" />
+                                    </div>
+                                )}
+                                <span className="line-clamp-1">{listing.hostName}</span>
+                            </div>
+                        </div>
+                    )}
                     {/* Price, Rating, and Max Guests */}
                     <div className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-900 flex-wrap">
                         {listing.discount > 0 && listing.discountedPrice ? (
