@@ -736,5 +736,4 @@ const Hostpage = () => {
 };
 
 export default Hostpage;
-export default Hostpage;
 
