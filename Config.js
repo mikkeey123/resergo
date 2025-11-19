@@ -3463,10 +3463,10 @@ export const createWishlist = async (guestId, listingId, hostId, listingTitle, d
 export const getHostWishlists = async (hostId) => {
     try {
         const wishlistsRef = collection(db, "wishlists");
+        // Remove orderBy to avoid requiring composite index - we'll sort in JavaScript instead
         const q = query(
             wishlistsRef,
-            where("hostId", "==", hostId),
-            orderBy("createdAt", "desc")
+            where("hostId", "==", hostId)
         );
         
         const snapshot = await getDocs(q);
@@ -3477,6 +3477,13 @@ export const getHostWishlists = async (hostId) => {
                 id: doc.id,
                 ...doc.data()
             });
+        });
+        
+        // Sort by createdAt descending (newest first) in JavaScript
+        wishlists.sort((a, b) => {
+            const aTime = a.createdAt?.toDate ? a.createdAt.toDate() : (a.createdAt ? new Date(a.createdAt) : new Date(0));
+            const bTime = b.createdAt?.toDate ? b.createdAt.toDate() : (b.createdAt ? new Date(b.createdAt) : new Date(0));
+            return bTime - aTime; // Descending order (newest first)
         });
         
         // Fetch guest data for each wishlist
