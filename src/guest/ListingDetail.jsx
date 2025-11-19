@@ -2271,6 +2271,92 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
         />
       )}
 
+      {/* Coupons Modal */}
+      {showCouponsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-auto max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Available Coupons</h2>
+                <p className="text-gray-600 mt-1">Coupons from {hostData?.Username || "this host"}</p>
+              </div>
+              <button
+                onClick={() => setShowCouponsModal(false)}
+                className="text-gray-500 hover:text-gray-700 transition"
+                aria-label="Close coupons modal"
+              >
+                <FaTimes className="text-xl" />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6">
+              {loadingCoupons ? (
+                <div className="flex items-center justify-center py-12">
+                  <p className="text-gray-600">Loading coupons...</p>
+                </div>
+              ) : availableCoupons.length === 0 ? (
+                <div className="text-center py-12">
+                  <FaTicketAlt className="text-6xl text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-600 text-lg mb-2">No coupons available</p>
+                  <p className="text-gray-500">This host hasn't created any coupons yet.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-4">
+                  {availableCoupons.map((coupon) => (
+                    <div key={coupon.id} className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-xl font-semibold text-gray-900">{coupon.code}</h3>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          coupon.isActive && (!coupon.expiresAt || coupon.expiresAt.toDate() > new Date())
+                            ? "bg-green-100 text-green-700 border border-green-300"
+                            : "bg-red-100 text-red-700 border border-red-300"
+                        }`}>
+                          {coupon.isActive && (!coupon.expiresAt || coupon.expiresAt.toDate() > new Date()) ? "Active" : "Expired/Inactive"}
+                        </span>
+                      </div>
+                      <p className="text-gray-700 mb-3">{coupon.description}</p>
+                      <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+                        <span>
+                          Discount: {coupon.discountType === "percentage" 
+                            ? `${coupon.discountValue}% OFF` 
+                            : `₱${coupon.discountValue.toLocaleString()} OFF`}
+                        </span>
+                        {coupon.expiresAt && (
+                          <span>Expires: {coupon.expiresAt.toDate().toLocaleDateString()}</span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => handleCopyCouponCode(coupon.code)}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+                      >
+                        {copiedCouponCode === coupon.code ? <FaCheck /> : <FaCopy />}
+                        <span>{copiedCouponCode === coupon.code ? "Copied!" : "Copy Code"}</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden input for copying coupon code */}
+      <input
+        ref={couponCopyInputRef}
+        type="text"
+        readOnly
+        style={{
+          position: 'fixed',
+          left: '-9999px',
+          top: '-9999px',
+          opacity: 0,
+          pointerEvents: 'none'
+        }}
+        aria-hidden="true"
+        tabIndex={-1}
+      />
+
     </div>
   );
 };
