@@ -31,8 +31,8 @@ const Guestpage = ({ currentView = "listings", onBackToListings, onNavigateToMes
     useEffect(() => {
         const listingId = id || new URLSearchParams(window.location.search).get('listingId');
         
-        if (listingId && !selectedListing) {
-            // Load listing from ID
+        if (listingId) {
+            // Always reload listing when ID changes (for navigation between different listings)
             const loadListingFromId = async () => {
                 try {
                     const listingData = await getListing(listingId);
@@ -51,8 +51,11 @@ const Guestpage = ({ currentView = "listings", onBackToListings, onNavigateToMes
                 }
             };
             loadListingFromId();
+        } else {
+            // Clear selected listing if no ID in URL
+            setSelectedListing(null);
         }
-    }, [id, selectedListing, navigate]);
+    }, [id, navigate]);
 
     // Handler for when a listing is clicked - use useCallback to stabilize reference
     const handleListingClick = useCallback((listing) => {
@@ -136,6 +139,7 @@ const Guestpage = ({ currentView = "listings", onBackToListings, onNavigateToMes
         console.log("Rendering ListingDetail with listing:", selectedListing);
         return (
             <ListingDetail 
+                key={selectedListing.id || id || 'listing-detail'}
                 listing={selectedListing} 
                 onBack={handleBack}
                 onNavigateToMessages={handleNavigateToMessages}
