@@ -1997,14 +1997,39 @@ export const createBooking = async (listingId, bookingData) => {
 
         const listing = listingDoc.data();
         const hostId = listing.hostId;
+        const category = listing.category || "Home";
 
-        // Calculate total amount
-        const checkInDate = new Date(bookingData.checkIn);
-        const checkOutDate = new Date(bookingData.checkOut);
-        const nights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
-        // Use 'rate' field (not 'price') as that's what listings use
-        const listingRate = listing.rate || listing.price || 0;
-        const basePrice = listingRate * nights;
+        // Calculate total amount based on category
+        let checkInDate = null;
+        let checkOutDate = null;
+        let bookingDate = null;
+        let basePrice = 0;
+        let nights = 1;
+
+        if (category === "Home") {
+            // Home bookings use checkIn/checkOut
+            if (!bookingData.checkIn || !bookingData.checkOut) {
+                throw new Error("Check-in and check-out dates are required for home bookings");
+            }
+            checkInDate = new Date(bookingData.checkIn);
+            checkOutDate = new Date(bookingData.checkOut);
+            nights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
+            const listingRate = listing.rate || listing.price || 0;
+            basePrice = listingRate * nights;
+        } else if (category === "Experience" || category === "Service") {
+            // Experience/Service bookings use bookingDate
+            if (!bookingData.bookingDate) {
+                throw new Error("Booking date is required for experience/service bookings");
+            }
+            bookingDate = new Date(bookingData.bookingDate);
+            // Use bookingDate as both checkIn and checkOut for calendar compatibility
+            checkInDate = bookingDate;
+            checkOutDate = bookingDate;
+            const listingRate = listing.rate || listing.price || 0;
+            basePrice = listingRate; // Single day/event price
+        } else {
+            throw new Error("Invalid listing category");
+        }
         
         // Apply coupon discount if provided
         let finalPrice = basePrice;
@@ -2025,7 +2050,7 @@ export const createBooking = async (listingId, bookingData) => {
         const hostData = await getUserData(hostId);
 
         // Create booking document
-        const bookingRef = await addDoc(collection(db, "bookings"), {
+        const bookingDoc = {
             listingId: listingId,
             listingTitle: listing.title,
             hostId: hostId,
@@ -2046,7 +2071,20 @@ export const createBooking = async (listingId, bookingData) => {
             paymentStatus: "pending", // pending, paid, refunded
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp()
-        });
+        };
+
+        // Add category-specific fields
+        if (category === "Experience" || category === "Service") {
+            bookingDoc.bookingDate = Timestamp.fromDate(bookingDate);
+            if (bookingData.bookingTime) {
+                bookingDoc.bookingTime = bookingData.bookingTime;
+            }
+            if (category === "Experience" && bookingData.groupSize) {
+                bookingDoc.groupSize = bookingData.groupSize;
+            }
+        }
+
+        const bookingRef = await addDoc(collection(db, "bookings"), bookingDoc);
 
         return { success: true, bookingId: bookingRef.id };
     } catch (error) {

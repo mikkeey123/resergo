@@ -44,23 +44,44 @@ const Calendar = () => {
     // Convert bookings to date-keyed object
     const bookingsByDate = {};
     bookings.forEach(booking => {
-        if (booking.checkIn && booking.status !== "canceled") {
-            const checkInDate = booking.checkIn.toDate();
+        if (booking.status === "canceled") return;
+        
+        let bookingDate = null;
+        
+        // Handle different booking types
+        if (booking.checkIn) {
+            // Home bookings use checkIn
+            bookingDate = booking.checkIn.toDate ? booking.checkIn.toDate() : new Date(booking.checkIn);
+        } else if (booking.bookingDate) {
+            // Experience/Service bookings use bookingDate
+            bookingDate = booking.bookingDate.toDate ? booking.bookingDate.toDate() : new Date(booking.bookingDate);
+        }
+        
+        if (bookingDate) {
             const dateKey = formatDateKey(
-                checkInDate.getFullYear(),
-                checkInDate.getMonth(),
-                checkInDate.getDate()
+                bookingDate.getFullYear(),
+                bookingDate.getMonth(),
+                bookingDate.getDate()
             );
             
             // If multiple bookings on same date, combine them
             if (!bookingsByDate[dateKey]) {
                 bookingsByDate[dateKey] = [];
             }
-            bookingsByDate[dateKey].push({
+            
+            // Build booking info with time if available
+            let bookingInfo = {
                 guest: booking.guestName || "Guest",
                 listing: booking.listingTitle || "Listing",
                 status: booking.status === "active" ? "confirmed" : "pending"
-            });
+            };
+            
+            // Add time for Experience/Service bookings
+            if (booking.bookingTime) {
+                bookingInfo.time = booking.bookingTime;
+            }
+            
+            bookingsByDate[dateKey].push(bookingInfo);
         }
     });
 
