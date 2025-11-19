@@ -54,8 +54,7 @@ import {
   FaChevronRight,
   FaTimes,
   FaTicketAlt,
-  FaCopy,
-  FaCheck
+  FaCopy
 } from "react-icons/fa";
 import { getListing, getUserData, saveReview, getListingReviews, updateReview, updateListingRating, auth, db, validateCoupon, createBooking, addFavorite, removeFavorite, isFavorite, getListingCoupons } from "../../Config";
 import WishlistModal from "./WishlistModal";
