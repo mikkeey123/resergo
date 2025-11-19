@@ -3493,8 +3493,8 @@ export const getHostWishlists = async (hostId) => {
                     const guestData = await getUserData(wishlist.guestId);
                     return {
                         ...wishlist,
-                        guestName: guestData?.Username || "Guest",
-                        guestAvatar: guestData?.ProfilePicture || null
+                        guestName: guestData?.Username || guestData?.displayName || "Guest",
+                        guestAvatar: guestData?.ProfilePicture || guestData?.photoURL || null
                     };
                 } catch (error) {
                     console.error("Error fetching guest data for wishlist:", error);

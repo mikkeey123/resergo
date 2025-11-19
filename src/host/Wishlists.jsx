@@ -83,19 +83,9 @@ const Wishlists = ({ refreshKey }) => {
     return (
         <div className="bg-white py-8 px-4 sm:px-8 md:px-12 lg:px-16 min-h-screen">
             <div className="max-w-6xl mx-auto space-y-6">
-                <div className="mb-6 flex items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold text-gray-900">Guest Wishlists</h1>
-                        <p className="text-gray-600 mt-1">View what guests are wishing for in your listings.</p>
-                    </div>
-                    <button
-                        onClick={fetchWishlists}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
-                        title="Refresh wishlists"
-                    >
-                        <FaCalendarAlt className="text-sm" />
-                        Refresh
-                    </button>
+                <div className="mb-6">
+                    <h1 className="text-3xl font-bold text-gray-900">Guest Wishlists</h1>
+                    <p className="text-gray-600 mt-1">View what guests are wishing for in your listings.</p>
                 </div>
 
                 {wishlists.length === 0 ? (
@@ -110,13 +100,22 @@ const Wishlists = ({ refreshKey }) => {
                             <div key={wishlist.id} className="bg-white rounded-xl shadow-md p-6 border border-gray-200 flex flex-col hover:shadow-lg transition">
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-3">
-                                        {wishlist.guestAvatar ? (
-                                            <img src={wishlist.guestAvatar} alt={wishlist.guestName} className="w-10 h-10 rounded-full object-cover" />
-                                        ) : (
-                                            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
-                                                <FaUser className="text-gray-500" />
-                                            </div>
-                                        )}
+                                        {wishlist.guestAvatar && wishlist.guestAvatar.trim() !== "" ? (
+                                            <img 
+                                                src={wishlist.guestAvatar} 
+                                                alt={wishlist.guestName} 
+                                                className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                                                onError={(e) => {
+                                                    e.target.style.display = 'none';
+                                                    e.target.nextSibling.style.display = 'flex';
+                                                }}
+                                            />
+                                        ) : null}
+                                        <div 
+                                            className={`w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center ${wishlist.guestAvatar && wishlist.guestAvatar.trim() !== "" ? 'hidden' : ''}`}
+                                        >
+                                            <FaUser className="text-gray-500" />
+                                        </div>
                                         <div>
                                             <h3 className="text-lg font-semibold text-gray-900">{wishlist.guestName}</h3>
                                             <p className="text-sm text-gray-600">wishes for:</p>
