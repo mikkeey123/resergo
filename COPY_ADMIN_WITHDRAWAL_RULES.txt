@@ -1,5 +1,3 @@
-COPY THIS ENTIRE BLOCK TO FIREBASE CONSOLE > FIRESTORE DATABASE > RULES
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -205,16 +203,16 @@ service cloud.firestore {
       
       // Hosts can update their own bookings, guests can update their own bookings, admins can update any booking
       // Ensure critical fields (hostId, guestId, listingId) are not changed during update
-      allow update: if ((isAuthenticated() && 
-                         ((resource.data.hostId == request.auth.uid && 
-                           request.resource.data.hostId == resource.data.hostId &&
-                           request.resource.data.guestId == resource.data.guestId &&
-                           request.resource.data.listingId == resource.data.listingId) ||
-                          (resource.data.guestId == request.auth.uid &&
-                           request.resource.data.hostId == resource.data.hostId &&
-                           request.resource.data.guestId == resource.data.guestId &&
-                           request.resource.data.listingId == resource.data.listingId))) ||
-                     isAdmin();
+      allow update: if isAdmin() || 
+                     (isAuthenticated() && 
+                      ((resource.data.hostId == request.auth.uid && 
+                        request.resource.data.hostId == resource.data.hostId &&
+                        request.resource.data.guestId == resource.data.guestId &&
+                        request.resource.data.listingId == resource.data.listingId) ||
+                       (resource.data.guestId == request.auth.uid &&
+                        request.resource.data.hostId == resource.data.hostId &&
+                        request.resource.data.guestId == resource.data.guestId &&
+                        request.resource.data.listingId == resource.data.listingId)));
       
       // Users cannot delete bookings (for booking history)
       allow delete: if false;
