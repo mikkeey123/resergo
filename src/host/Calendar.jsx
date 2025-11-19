@@ -261,6 +261,14 @@ const Calendar = () => {
                                             </p>
                                         </div>
                                     )}
+                                    {booking.time && (
+                                        <div className="mt-2">
+                                            <p className="text-sm text-gray-600 mb-1">Time</p>
+                                            <p className="font-semibold text-gray-900">
+                                                {booking.time}
+                                            </p>
+                                        </div>
+                                    )}
                                     <div className="mt-2">
                                         <p className="text-sm text-gray-600 mb-1">Status</p>
                                         <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
