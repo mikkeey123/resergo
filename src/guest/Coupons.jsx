@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
-import { FaCopy, FaCheck, FaTicketAlt } from "react-icons/fa";
-import { auth, getAllAvailableCoupons } from "../../Config";
+import { FaCopy, FaCheck, FaTicketAlt, FaUser } from "react-icons/fa";
+import { auth, getAllAvailableCoupons, getUserData } from "../../Config";
 import { onAuthStateChanged } from "firebase/auth";
 import { useLocation } from "react-router-dom";
 
@@ -18,7 +18,36 @@ const Coupons = () => {
         setError("");
         try {
             const availableCoupons = await getAllAvailableCoupons();
-            setCoupons(availableCoupons);
+            
+            // Fetch host data for each coupon
+            const couponsWithHostData = await Promise.all(
+                availableCoupons.map(async (coupon) => {
+                    try {
+                        if (coupon.hostId) {
+                            const hostData = await getUserData(coupon.hostId);
+                            return {
+                                ...coupon,
+                                hostName: hostData?.Username || hostData?.displayName || "Unknown Host",
+                                hostAvatar: hostData?.ProfilePicture || hostData?.photoURL || null
+                            };
+                        }
+                        return {
+                            ...coupon,
+                            hostName: "Unknown Host",
+                            hostAvatar: null
+                        };
+                    } catch (err) {
+                        console.error(`Error fetching host data for coupon ${coupon.id}:`, err);
+                        return {
+                            ...coupon,
+                            hostName: "Unknown Host",
+                            hostAvatar: null
+                        };
+                    }
+                })
+            );
+            
+            setCoupons(couponsWithHostData);
         } catch (err) {
             console.error("Error fetching coupons:", err);
             setError("Failed to load coupons. Please try again.");
@@ -126,6 +155,27 @@ const Coupons = () => {
                                     </span>
                                 </div>
                                 <p className="text-gray-700 mb-3 flex-1">{coupon.description}</p>
+                                <div className="flex items-center gap-2 mb-3 text-sm text-gray-600">
+                                    <FaUser className="text-gray-500" />
+                                    <span className="font-medium">Host:</span>
+                                    <div className="flex items-center gap-2">
+                                        {coupon.hostAvatar ? (
+                                            <img 
+                                                src={coupon.hostAvatar} 
+                                                alt={coupon.hostName}
+                                                className="w-6 h-6 rounded-full object-cover"
+                                                onError={(e) => {
+                                                    e.target.style.display = 'none';
+                                                }}
+                                            />
+                                        ) : (
+                                            <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
+                                                <FaUser className="text-gray-500 text-xs" />
+                                            </div>
+                                        )}
+                                        <span>{coupon.hostName}</span>
+                                    </div>
+                                </div>
                                 <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
                                     <span>
                                         Discount: {coupon.discountType === "percentage" 
