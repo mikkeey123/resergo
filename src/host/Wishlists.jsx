@@ -100,21 +100,22 @@ const Wishlists = ({ refreshKey }) => {
                             <div key={wishlist.id} className="bg-white rounded-xl shadow-md p-6 border border-gray-200 flex flex-col hover:shadow-lg transition">
                                 <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-3">
-                                        {wishlist.guestAvatar && wishlist.guestAvatar.trim() !== "" ? (
-                                            <img 
-                                                src={wishlist.guestAvatar} 
-                                                alt={wishlist.guestName} 
-                                                className="w-10 h-10 rounded-full object-cover border border-gray-200"
-                                                onError={(e) => {
-                                                    e.target.style.display = 'none';
-                                                    e.target.nextSibling.style.display = 'flex';
-                                                }}
-                                            />
-                                        ) : null}
-                                        <div 
-                                            className={`w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center ${wishlist.guestAvatar && wishlist.guestAvatar.trim() !== "" ? 'hidden' : ''}`}
-                                        >
-                                            <FaUser className="text-gray-500" />
+                                        <div className="relative w-10 h-10">
+                                            {wishlist.guestAvatar && wishlist.guestAvatar.trim() !== "" ? (
+                                                <img 
+                                                    src={wishlist.guestAvatar} 
+                                                    alt={wishlist.guestName} 
+                                                    className="w-10 h-10 rounded-full object-cover border border-gray-200"
+                                                    onError={(e) => {
+                                                        e.target.style.display = 'none';
+                                                    }}
+                                                />
+                                            ) : null}
+                                            <div 
+                                                className={`absolute inset-0 w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center ${wishlist.guestAvatar && wishlist.guestAvatar.trim() !== "" ? 'hidden' : ''}`}
+                                            >
+                                                <FaUser className="text-gray-500" />
+                                            </div>
                                         </div>
                                         <div>
                                             <h3 className="text-lg font-semibold text-gray-900">{wishlist.guestName}</h3>
