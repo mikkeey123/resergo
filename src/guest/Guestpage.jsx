@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import Selection from "../components/Selection";
 import Body from "../components/Body";
 import ListingDetail from "./ListingDetail";
@@ -13,6 +13,7 @@ import { getListing } from "../../Config";
 const Guestpage = ({ currentView = "listings", onBackToListings, onNavigateToMessages, searchFilters = {}, onSearchFilters }) => {
     const { id } = useParams(); // Get listing ID from route
     const navigate = useNavigate();
+    const location = useLocation();
     const [activeSelection, setActiveSelection] = useState("Home");
     const [selectedListing, setSelectedListing] = useState(null);
     const [showMessagesModal, setShowMessagesModal] = useState(false);
@@ -110,24 +111,24 @@ const Guestpage = ({ currentView = "listings", onBackToListings, onNavigateToMes
         );
     }
 
-    // Show favorites page if currentView is "favorites"
-    if (currentView === "favorites") {
-        return <Favorites onBack={onBackToListings} />;
+    // Show favorites page if currentView is "favorites" or route is /guest/favorites
+    if (currentView === "favorites" || location.pathname === '/guest/favorites') {
+        return <Favorites onBack={onBackToListings} key={location.pathname} />;
     }
 
-    // Show payments page if currentView is "payments"
-    if (currentView === "payments") {
-        return <Payments onBack={onBackToListings} />;
+    // Show payments page if currentView is "payments" or route is /guest/payments
+    if (currentView === "payments" || location.pathname === '/guest/payments') {
+        return <Payments onBack={onBackToListings} key={location.pathname} />;
     }
 
-    // Show bookings page if currentView is "bookings"
-    if (currentView === "bookings") {
-        return <Bookings onBack={onBackToListings} />;
+    // Show bookings page if currentView is "bookings" or route is /guest/bookings
+    if (currentView === "bookings" || location.pathname === '/guest/bookings') {
+        return <Bookings onBack={onBackToListings} key={location.pathname} />;
     }
 
-    // Show coupons page if currentView is "coupons"
-    if (currentView === "coupons") {
-        return <Coupons />;
+    // Show coupons page if currentView is "coupons" or route is /guest/coupons
+    if (currentView === "coupons" || location.pathname === '/guest/coupons') {
+        return <Coupons key={location.pathname} />;
     }
 
     // If a listing is selected, show the detail view

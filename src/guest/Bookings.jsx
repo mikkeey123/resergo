@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { FaCalendarAlt, FaClock, FaCheckCircle, FaTimes, FaBan, FaChevronDown, FaChevronUp, FaMoneyBillWave, FaTag, FaUser, FaHome } from "react-icons/fa";
 import { auth, getGuestBookings, requestCancelBooking } from "../../Config";
+import { useLocation } from "react-router-dom";
 
 const Bookings = ({ onBack }) => {
     const [bookings, setBookings] = useState([]);
@@ -11,30 +12,38 @@ const Bookings = ({ onBack }) => {
     const [expandedBookings, setExpandedBookings] = useState(new Set());
     const [statusFilter, setStatusFilter] = useState("All"); // All, Pending, Approved, Rejected
     const [typeFilter, setTypeFilter] = useState("All"); // All, Reservation, Cancellation
+    const location = useLocation();
+
+    const fetchBookings = async () => {
+        if (!auth.currentUser) {
+            setLoading(false);
+            return;
+        }
+        
+        setLoading(true);
+        setError("");
+        try {
+            const guestBookings = await getGuestBookings(auth.currentUser.uid);
+            setBookings(guestBookings);
+        } catch (err) {
+            console.error("Error fetching bookings:", err);
+            setError("Failed to load bookings. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Fetch bookings on component mount
     useEffect(() => {
-        const fetchBookings = async () => {
-            if (!auth.currentUser) {
-                setLoading(false);
-                return;
-            }
-            
-            setLoading(true);
-            setError("");
-            try {
-                const guestBookings = await getGuestBookings(auth.currentUser.uid);
-                setBookings(guestBookings);
-            } catch (err) {
-                console.error("Error fetching bookings:", err);
-                setError("Failed to load bookings. Please try again.");
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchBookings();
     }, []);
+
+    // Refresh when navigating to this page
+    useEffect(() => {
+        if (location.pathname === '/guest/bookings') {
+            fetchBookings();
+        }
+    }, [location.pathname]);
 
     // Filter bookings by status and type
     const getFilteredBookings = () => {

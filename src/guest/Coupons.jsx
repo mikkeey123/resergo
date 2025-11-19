@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { FaCopy, FaCheck, FaTicketAlt } from "react-icons/fa";
 import { auth, getAllAvailableCoupons } from "../../Config";
 import { onAuthStateChanged } from "firebase/auth";
+import { useLocation } from "react-router-dom";
 
 const Coupons = () => {
     const [coupons, setCoupons] = useState([]);
@@ -10,6 +11,21 @@ const Coupons = () => {
     const [copiedCode, setCopiedCode] = useState(null);
     const copyInputRef = useRef(null);
     const [userId, setUserId] = useState(null);
+    const location = useLocation();
+
+    const fetchCoupons = async () => {
+        setLoading(true);
+        setError("");
+        try {
+            const availableCoupons = await getAllAvailableCoupons();
+            setCoupons(availableCoupons);
+        } catch (err) {
+            console.error("Error fetching coupons:", err);
+            setError("Failed to load coupons. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -25,19 +41,12 @@ const Coupons = () => {
         return () => unsubscribe();
     }, []);
 
-    const fetchCoupons = async () => {
-        setLoading(true);
-        setError("");
-        try {
-            const availableCoupons = await getAllAvailableCoupons();
-            setCoupons(availableCoupons);
-        } catch (err) {
-            console.error("Error fetching coupons:", err);
-            setError("Failed to load coupons. Please try again.");
-        } finally {
-            setLoading(false);
+    // Refresh when navigating to this page
+    useEffect(() => {
+        if (location.pathname === '/guest/coupons') {
+            fetchCoupons();
         }
-    };
+    }, [location.pathname]);
 
     const handleCopyCode = (code) => {
         if (copyInputRef.current) {

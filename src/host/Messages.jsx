@@ -1,16 +1,73 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { FaSearch, FaPaperPlane, FaUser, FaTrash } from "react-icons/fa";
 import { auth, getConversations, getMessages, sendMessage, markMessagesAsRead, getUserData, getUnreadCountsByConversation, deleteConversation } from "../../Config";
 import { onAuthStateChanged } from "firebase/auth";
 import MessageBox from "../components/MessageBox";
 
-const Messages = () => {
+const Messages = ({ refreshKey }) => {
     const [conversations, setConversations] = useState([]);
     const [selectedConversation, setSelectedConversation] = useState(null);
     const [currentUserId, setCurrentUserId] = useState(null);
     const [loading, setLoading] = useState(true);
     const [unreadCounts, setUnreadCounts] = useState({});
     const [searchQuery, setSearchQuery] = useState("");
+    const prevRefreshKeyRef = useRef(refreshKey);
+
+    const loadConversations = async () => {
+        if (!currentUserId) return;
+        setLoading(true);
+        try {
+            const [convos, counts] = await Promise.all([
+                getConversations(currentUserId),
+                getUnreadCountsByConversation(currentUserId)
+            ]);
+            
+            const enrichedConversations = await Promise.all(
+                convos.map(async (convo) => {
+                    const otherUserId =
+                        convo.participant1Id === currentUserId
+                            ? convo.participant2Id
+                            : convo.participant1Id;
+                    
+                    const conversationId = [currentUserId, otherUserId].sort().join('_');
+                    const unreadCount = counts[conversationId] || 0;
+                    
+                    try {
+                        const userData = await getUserData(otherUserId);
+                        return {
+                            ...convo,
+                            otherUserId,
+                            otherUserName: userData?.Username || userData?.displayName || "User",
+                            otherUserAvatar: userData?.ProfilePicture || userData?.photoURL || null,
+                            unreadCount
+                        };
+                    } catch (error) {
+                        console.error("Error loading user data:", error);
+                        return {
+                            ...convo,
+                            otherUserId,
+                            otherUserName: "User",
+                            otherUserAvatar: null,
+                            unreadCount
+                        };
+                    }
+                })
+            );
+            setConversations(enrichedConversations);
+            
+            // Store unread counts by conversation ID
+            const countsMap = {};
+            enrichedConversations.forEach(convo => {
+                const conversationId = [currentUserId, convo.otherUserId].sort().join('_');
+                countsMap[conversationId] = convo.unreadCount;
+            });
+            setUnreadCounts(countsMap);
+        } catch (error) {
+            console.error("Error loading conversations:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Load current user
     useEffect(() => {
@@ -27,59 +84,17 @@ const Messages = () => {
     // Load conversations and unread counts
     useEffect(() => {
         if (currentUserId) {
-            setLoading(true);
-            Promise.all([
-                getConversations(currentUserId),
-                getUnreadCountsByConversation(currentUserId)
-            ]).then(async ([convos, counts]) => {
-                // Enrich conversations with user data
-                const enrichedConversations = await Promise.all(
-                    convos.map(async (convo) => {
-                        const otherUserId =
-                            convo.participant1Id === currentUserId
-                                ? convo.participant2Id
-                                : convo.participant1Id;
-                        
-                        const conversationId = [currentUserId, otherUserId].sort().join('_');
-                        const unreadCount = counts[conversationId] || 0;
-                        
-                        try {
-                            const userData = await getUserData(otherUserId);
-                            return {
-                                ...convo,
-                                otherUserId,
-                                otherUserName: userData?.Username || userData?.displayName || "User",
-                                otherUserAvatar: userData?.ProfilePicture || userData?.photoURL || null,
-                                unreadCount
-                            };
-                        } catch (error) {
-                            console.error("Error loading user data:", error);
-                            return {
-                                ...convo,
-                                otherUserId,
-                                otherUserName: "User",
-                                otherUserAvatar: null,
-                                unreadCount
-                            };
-                        }
-                    })
-                );
-                setConversations(enrichedConversations);
-                
-                // Store unread counts by conversation ID
-                const countsMap = {};
-                enrichedConversations.forEach(convo => {
-                    const conversationId = [currentUserId, convo.otherUserId].sort().join('_');
-                    countsMap[conversationId] = convo.unreadCount;
-                });
-                setUnreadCounts(countsMap);
-                setLoading(false);
-            }).catch((error) => {
-                console.error("Error loading conversations:", error);
-                setLoading(false);
-            });
+            loadConversations();
         }
     }, [currentUserId]);
+
+    // Refresh when refreshKey changes
+    useEffect(() => {
+        if (refreshKey && refreshKey !== prevRefreshKeyRef.current && currentUserId) {
+            prevRefreshKeyRef.current = refreshKey;
+            loadConversations();
+        }
+    }, [refreshKey, currentUserId]);
 
     // Poll for new conversations and unread counts
     useEffect(() => {

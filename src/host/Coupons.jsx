@@ -4,7 +4,7 @@ import { auth, getHostCoupons, createCoupon, updateCoupon, deleteCoupon, getConv
 import { onAuthStateChanged } from "firebase/auth";
 import { Timestamp } from "firebase/firestore";
 
-const Coupons = () => {
+const Coupons = ({ refreshKey }) => {
     const [coupons, setCoupons] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -27,6 +27,7 @@ const Coupons = () => {
     const [sendingMessage, setSendingMessage] = useState(false);
     const [copiedCode, setCopiedCode] = useState(null);
     const copyInputRef = useRef(null);
+    const prevRefreshKeyRef = useRef(refreshKey);
 
     // Get current user
     useEffect(() => {
@@ -47,6 +48,15 @@ const Coupons = () => {
             loadConversations();
         }
     }, [currentUserId]);
+
+    // Refresh when refreshKey changes
+    useEffect(() => {
+        if (refreshKey && refreshKey !== prevRefreshKeyRef.current && currentUserId) {
+            prevRefreshKeyRef.current = refreshKey;
+            loadCoupons();
+            loadConversations();
+        }
+    }, [refreshKey, currentUserId]);
 
     // Load conversations for sending coupons
     const loadConversations = async () => {

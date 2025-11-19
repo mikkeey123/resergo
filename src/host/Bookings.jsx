@@ -1,33 +1,42 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { FaCalendarAlt, FaClock, FaCheckCircle, FaCheck, FaBan } from "react-icons/fa";
 import { auth, getHostBookings, updateBookingStatus, approveCancelBooking } from "../../Config";
 
-const Bookings = () => {
+const Bookings = ({ refreshKey }) => {
     const [bookings, setBookings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [processingId, setProcessingId] = useState(null);
+    const prevRefreshKeyRef = useRef(refreshKey);
+
+    const fetchBookings = async () => {
+        if (!auth.currentUser) return;
+        
+        setLoading(true);
+        setError("");
+        try {
+            const hostBookings = await getHostBookings(auth.currentUser.uid);
+            setBookings(hostBookings);
+        } catch (err) {
+            console.error("Error fetching bookings:", err);
+            setError("Failed to load bookings. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Fetch bookings on component mount
     useEffect(() => {
-        const fetchBookings = async () => {
-            if (!auth.currentUser) return;
-            
-            setLoading(true);
-            setError("");
-            try {
-                const hostBookings = await getHostBookings(auth.currentUser.uid);
-                setBookings(hostBookings);
-            } catch (err) {
-                console.error("Error fetching bookings:", err);
-                setError("Failed to load bookings. Please try again.");
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchBookings();
     }, []);
+
+    // Refresh when refreshKey changes
+    useEffect(() => {
+        if (refreshKey && refreshKey !== prevRefreshKeyRef.current) {
+            prevRefreshKeyRef.current = refreshKey;
+            fetchBookings();
+        }
+    }, [refreshKey]);
 
     // Filter bookings - only show pending and cancel_requested bookings
     const pendingBookings = bookings.filter(booking => {

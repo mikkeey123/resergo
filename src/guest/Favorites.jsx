@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { FaImage, FaHeart, FaRegHeart, FaStar } from "react-icons/fa";
 import { auth, getFavoriteListings, removeFavorite } from "../../Config";
 import { onAuthStateChanged } from "firebase/auth";
+import { useLocation } from "react-router-dom";
 import ListingDetail from "./ListingDetail";
 
 const Favorites = ({ onBack }) => {
@@ -10,21 +11,27 @@ const Favorites = ({ onBack }) => {
     const [userId, setUserId] = useState(null);
     const [selectedListing, setSelectedListing] = useState(null);
     const [selectedCategory, setSelectedCategory] = useState("All");
+    const location = useLocation();
+
+    const loadFavorites = useCallback(async (uid) => {
+        if (!uid) return;
+        try {
+            setLoading(true);
+            const favorites = await getFavoriteListings(uid);
+            setFavoriteListings(favorites);
+        } catch (error) {
+            console.error("Error loading favorites:", error);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
 
     // Load user favorites
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             if (user) {
                 setUserId(user.uid);
-                try {
-                    setLoading(true);
-                    const favorites = await getFavoriteListings(user.uid);
-                    setFavoriteListings(favorites);
-                } catch (error) {
-                    console.error("Error loading favorites:", error);
-                } finally {
-                    setLoading(false);
-                }
+                await loadFavorites(user.uid);
             } else {
                 setUserId(null);
                 setFavoriteListings([]);
@@ -32,7 +39,14 @@ const Favorites = ({ onBack }) => {
             }
         });
         return () => unsubscribe();
-    }, []);
+    }, [loadFavorites]);
+
+    // Refresh when navigating to this page
+    useEffect(() => {
+        if (location.pathname === '/guest/favorites' && userId) {
+            loadFavorites(userId);
+        }
+    }, [location.pathname, userId, loadFavorites]);
 
     // Handler for when a listing is clicked
     const handleListingClick = useCallback((listing) => {

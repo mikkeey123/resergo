@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { FaWallet, FaPaypal, FaArrowUp, FaArrowDown, FaHistory, FaTimes, FaCheckCircle } from "react-icons/fa";
 import { auth, getWalletBalance, topUpWallet, withdrawFromWallet, getTransactionHistory } from "../../Config";
 import { onAuthStateChanged } from "firebase/auth";
+import { useLocation } from "react-router-dom";
 import { PayPalScriptProvider, PayPalButtons, usePayPalScriptReducer } from "@paypal/react-paypal-js";
 import { PAYPAL_CONFIG, paypalSdkOptions, isPayPalConfigured } from "../config/paypal";
 
@@ -221,6 +222,7 @@ const EWallet = ({ userId = null }) => {
     const [currentUserId, setCurrentUserId] = useState(null);
     const [paypalError, setPaypalError] = useState("");
     const [debouncedAmount, setDebouncedAmount] = useState("");
+    const location = useLocation();
 
     // Get current user
     useEffect(() => {
@@ -235,30 +237,37 @@ const EWallet = ({ userId = null }) => {
     }, []);
 
     // Load wallet balance and transaction history
-    useEffect(() => {
-        const loadData = async () => {
-            if (!currentUserId && !userId) return;
-            
-            setLoading(true);
-            setLoadingTransactions(true);
-            try {
-                const targetUserId = userId || currentUserId;
-                const [walletBalance, history] = await Promise.all([
-                    getWalletBalance(targetUserId),
-                    getTransactionHistory(targetUserId)
-                ]);
-                setBalance(walletBalance);
-                setTransactions(history);
-            } catch (error) {
-                console.error("Error loading wallet data:", error);
-            } finally {
-                setLoading(false);
-                setLoadingTransactions(false);
-            }
-        };
-
-        loadData();
+    const loadData = useCallback(async () => {
+        if (!currentUserId && !userId) return;
+        
+        setLoading(true);
+        setLoadingTransactions(true);
+        try {
+            const targetUserId = userId || currentUserId;
+            const [walletBalance, history] = await Promise.all([
+                getWalletBalance(targetUserId),
+                getTransactionHistory(targetUserId)
+            ]);
+            setBalance(walletBalance);
+            setTransactions(history);
+        } catch (error) {
+            console.error("Error loading wallet data:", error);
+        } finally {
+            setLoading(false);
+            setLoadingTransactions(false);
+        }
     }, [currentUserId, userId]);
+
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
+
+    // Refresh when navigating to payments page
+    useEffect(() => {
+        if (location.pathname === '/guest/payments' || (location.pathname.includes('/host') && currentUserId)) {
+            loadData();
+        }
+    }, [location.pathname, currentUserId, loadData]);
 
     // Debounce topUpAmount to prevent PayPal button from re-rendering on every keystroke
     useEffect(() => {

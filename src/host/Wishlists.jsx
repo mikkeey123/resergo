@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FaGift, FaUser, FaHome, FaCalendarAlt } from 'react-icons/fa';
 import { auth, getHostWishlists, getUserData } from '../../Config';
 import { onAuthStateChanged } from 'firebase/auth';
 
-const Wishlists = () => {
+const Wishlists = ({ refreshKey }) => {
     const [wishlists, setWishlists] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [hostId, setHostId] = useState(null);
+    const prevRefreshKeyRef = useRef(refreshKey);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -43,6 +44,14 @@ const Wishlists = () => {
             fetchWishlists();
         }
     }, [hostId]);
+
+    // Refresh when refreshKey changes
+    useEffect(() => {
+        if (refreshKey && refreshKey !== prevRefreshKeyRef.current && hostId) {
+            prevRefreshKeyRef.current = refreshKey;
+            fetchWishlists();
+        }
+    }, [refreshKey, hostId]);
 
     if (loading) {
         return (

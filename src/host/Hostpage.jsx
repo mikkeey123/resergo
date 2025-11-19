@@ -698,17 +698,17 @@ const Hostpage = () => {
                         </div>
                     )}
 
-                    {activeTab === "listings" && <Listings key={`listings-${tabRefreshKey.listings || 0}`} />}
+                    {activeTab === "listings" && <Listings key={`listings-${tabRefreshKey.listings || 0}`} refreshKey={tabRefreshKey.listings} />}
 
                     {activeTab === "messages" && <Messages key={`messages-${tabRefreshKey.messages || 0}`} />}
 
                     {activeTab === "calendar" && <Calendar key={`calendar-${tabRefreshKey.calendar || 0}`} />}
 
-                    {activeTab === "bookings" && <Bookings key={`bookings-${tabRefreshKey.bookings || 0}`} />}
+                    {activeTab === "bookings" && <Bookings key={`bookings-${tabRefreshKey.bookings || 0}`} refreshKey={tabRefreshKey.bookings} />}
 
-                    {activeTab === "coupons" && <Coupons key={`coupons-${tabRefreshKey.coupons || 0}`} />}
+                    {activeTab === "coupons" && <Coupons key={`coupons-${tabRefreshKey.coupons || 0}`} refreshKey={tabRefreshKey.coupons} />}
 
-                    {activeTab === "wishlists" && <Wishlists key={`wishlists-${tabRefreshKey.wishlists || 0}`} />}
+                    {activeTab === "wishlists" && <Wishlists key={`wishlists-${tabRefreshKey.wishlists || 0}`} refreshKey={tabRefreshKey.wishlists} />}
 
                     {activeTab === "payments" && <PaymentMethods key={`payments-${tabRefreshKey.payments || 0}`} />}
 

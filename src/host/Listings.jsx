@@ -1,18 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { FaEdit, FaTrash, FaUpload, FaCheckCircle, FaTimesCircle, FaPlus, FaFileAlt } from "react-icons/fa";
 import { auth, getHostListings, deleteListing, updateListing } from "../../Config";
 import AddListingModal from "./AddListingModal";
 
-const Listings = () => {
+const Listings = ({ refreshKey }) => {
     const [listings, setListings] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState("all"); // all, published, drafts
     const [modalOpen, setModalOpen] = useState(false);
     const [editingListing, setEditingListing] = useState(null);
-
-    useEffect(() => {
-        loadListings();
-    }, []);
+    const prevRefreshKeyRef = useRef(refreshKey);
 
     const loadListings = async () => {
         try {
@@ -48,6 +45,18 @@ const Listings = () => {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        loadListings();
+    }, []);
+
+    // Refresh when refreshKey changes
+    useEffect(() => {
+        if (refreshKey && refreshKey !== prevRefreshKeyRef.current) {
+            prevRefreshKeyRef.current = refreshKey;
+            loadListings();
+        }
+    }, [refreshKey]);
 
     const handleDelete = async (listingId) => {
         if (window.confirm("Are you sure you want to delete this listing? This action cannot be undone.")) {
