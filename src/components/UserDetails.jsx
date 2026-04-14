@@ -295,16 +295,7 @@ const UserDetails = ({ onBack, hideBackButton = false, isHostPage = false }) => 
     return (
         <div className={isHostPage ? "space-y-6" : "bg-white min-h-screen py-8 px-4 sm:px-8 md:px-12 lg:px-16"}>
             <div className={isHostPage ? "" : "max-w-4xl mx-auto"}>
-                {/* Back Button */}
-                {!hideBackButton && (
-                    <button
-                        type="button"
-                        onClick={handleBackClick}
-                        className="mb-6 text-blue-600 hover:text-blue-700 font-medium cursor-pointer"
-                    >
-                        Back
-                    </button>
-                )}
+                {/* Back Button removed per user request */}
 
                 {/* Header */}
                 {!isHostPage && (

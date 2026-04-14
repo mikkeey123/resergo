@@ -6,24 +6,21 @@ import emailjs from '@emailjs/browser';
 // - Service ID: Email Services > Your Service > Service ID
 // - Template IDs: Email Templates > Your Templates > Template ID
 
-// EmailJS credentials - using environment variables
-// Fallback values are provided for development (replace with your actual values if not using .env)
-const PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'BCWKT-neLyeOkJ-Lz';
-const SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_2q8vvwm';
-
-// Registration templates - separate for host and guest
-// Update these in .env file to match your EmailJS Dashboard template IDs
+// Auth/Registration Account - Account 1
+const PUBLIC_KEY_AUTH = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'BCWKT-neLyeOkJ-Lz';
+const SERVICE_ID_AUTH = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'service_2q8vvwm';
 const TEMPLATE_ID_HOST = import.meta.env.VITE_EMAILJS_TEMPLATE_ID_HOST || 'template_pjxc82i';
 const TEMPLATE_ID_GUEST = import.meta.env.VITE_EMAILJS_TEMPLATE_ID_GUEST || 'template_z495ecl';
 
-// Booking templates - for approval and rejection
+// Bookings Account - Account 2
+// If you don't provide these in .env, it gracefully falls back to Account 1
+const PUBLIC_KEY_BOOKING = import.meta.env.VITE_EMAILJS_PUBLIC_KEY_BOOKING || PUBLIC_KEY_AUTH;
+const SERVICE_ID_BOOKING = import.meta.env.VITE_EMAILJS_SERVICE_ID_BOOKING || SERVICE_ID_AUTH;
 const TEMPLATE_ID_BOOKING_APPROVAL = import.meta.env.VITE_EMAILJS_TEMPLATE_ID_BOOKING_APPROVAL || 'template_d5qa8cd';
 const TEMPLATE_ID_BOOKING_REJECTION = import.meta.env.VITE_EMAILJS_TEMPLATE_ID_BOOKING_REJECTION || 'template_9508bwo';
 
-// Initialize EmailJS
-if (PUBLIC_KEY) {
-    emailjs.init(PUBLIC_KEY);
-}
+// We do NOT call emailjs.init() when running multiple accounts. 
+// Instead, we will pass the distinct public key directly into the send() function calls.
 
 /**
  * Send welcome email to newly registered user
@@ -42,7 +39,7 @@ export const sendWelcomeEmail = async (email, username, userType) => {
     }
     
     // Check if EmailJS is properly configured
-    if (!PUBLIC_KEY || !SERVICE_ID) {
+    if (!PUBLIC_KEY_AUTH || !SERVICE_ID_AUTH) {
         console.warn('❌ EmailJS not configured. Skipping welcome email.');
         return { success: false, error: 'EmailJS not configured' };
     }
@@ -57,7 +54,7 @@ export const sendWelcomeEmail = async (email, username, userType) => {
         // Use separate template based on user type
         const templateId = userType === 'host' ? TEMPLATE_ID_HOST : TEMPLATE_ID_GUEST;
         console.log('📧 EmailJS: Using template ID:', templateId, 'for user type:', userType);
-        console.log('📧 EmailJS Config:', { PUBLIC_KEY, SERVICE_ID, TEMPLATE_ID_HOST, TEMPLATE_ID_GUEST });
+        console.log('📧 EmailJS Config:', { PUBLIC_KEY: PUBLIC_KEY_AUTH, SERVICE_ID: SERVICE_ID_AUTH, TEMPLATE_ID_HOST, TEMPLATE_ID_GUEST });
         
         // Check if template ID is configured
         if (!templateId) {
@@ -83,9 +80,10 @@ export const sendWelcomeEmail = async (email, username, userType) => {
         console.log('📧 EmailJS: Recipient email:', email);
 
         const response = await emailjs.send(
-            SERVICE_ID,
+            SERVICE_ID_AUTH,
             templateId,
-            templateParams
+            templateParams,
+            PUBLIC_KEY_AUTH
         );
 
         console.log('✅ Welcome email sent successfully!', response);
@@ -109,19 +107,19 @@ export const sendWelcomeEmail = async (email, username, userType) => {
             if (error.status === 400) {
                 console.error('❌ Bad Request (400) - Template ID not found or template not published!');
                 console.error('❌ Template ID used:', templateId);
-                console.error('❌ Service ID used:', SERVICE_ID);
+                console.error('❌ Service ID used:', SERVICE_ID_AUTH);
                 console.error('❌ Common issues:');
                 console.error('   1. Template is in "Draft" mode (must be "Published")');
                 console.error('   2. Template is associated with wrong service ID');
                 console.error('   3. Template ID doesn\'t match EmailJS Dashboard');
                 console.error('   4. Service ID doesn\'t match EmailJS Dashboard');
-                console.error('❌ Fix: Go to EmailJS Dashboard → Email Templates → Check template is Published and associated with service:', SERVICE_ID);
+                console.error('❌ Fix: Go to EmailJS Dashboard → Email Templates → Check template is Published and associated with service:', SERVICE_ID_AUTH);
             } else if (error.status === 401) {
                 console.error('❌ Unauthorized (401) - Check Public Key is correct');
             } else if (error.status === 404) {
                 console.error('❌ Not Found (404) - Check Service ID and Template ID are correct');
                 console.error('❌ Template ID used:', templateId);
-                console.error('❌ Service ID used:', SERVICE_ID);
+                console.error('❌ Service ID used:', SERVICE_ID_AUTH);
             } else if (error.status === 429) {
                 console.error('❌ Rate Limit Exceeded (429) - Check EmailJS quota');
             }
@@ -164,7 +162,7 @@ export const sendBookingApprovalEmail = async (guestEmail, guestName, listingTit
     }
     
     // Check if EmailJS is properly configured
-    if (!PUBLIC_KEY || !SERVICE_ID) {
+    if (!PUBLIC_KEY_BOOKING || !SERVICE_ID_BOOKING) {
         console.warn('❌ EmailJS not configured. Skipping booking approval email.');
         return { success: false, error: 'EmailJS not configured' };
     }
@@ -195,9 +193,10 @@ export const sendBookingApprovalEmail = async (guestEmail, guestName, listingTit
         console.log('📧 EmailJS: Recipient email:', guestEmail);
 
         const response = await emailjs.send(
-            SERVICE_ID,
+            SERVICE_ID_BOOKING,
             TEMPLATE_ID_BOOKING_APPROVAL,
-            templateParams
+            templateParams,
+            PUBLIC_KEY_BOOKING
         );
 
         console.log('✅ Booking approval email sent successfully!', response);
@@ -216,7 +215,7 @@ export const sendBookingApprovalEmail = async (guestEmail, guestName, listingTit
         if (error.status === 400) {
             console.error('❌ Bad Request (400) - Template ID not found or template not published!');
             console.error('❌ Template ID used:', TEMPLATE_ID_BOOKING_APPROVAL);
-            console.error('❌ Service ID used:', SERVICE_ID);
+            console.error('❌ Service ID used:', SERVICE_ID_BOOKING);
             console.error('❌ Common issues:');
             console.error('   1. Template is in "Draft" mode (must be "Published")');
             console.error('   2. Template ID doesn\'t match EmailJS Dashboard');
@@ -249,7 +248,7 @@ export const sendBookingRejectionEmail = async (guestEmail, guestName, listingTi
     }
     
     // Check if EmailJS is properly configured
-    if (!PUBLIC_KEY || !SERVICE_ID) {
+    if (!PUBLIC_KEY_BOOKING || !SERVICE_ID_BOOKING) {
         console.warn('❌ EmailJS not configured. Skipping booking rejection email.');
         return { success: false, error: 'EmailJS not configured' };
     }
@@ -279,9 +278,10 @@ export const sendBookingRejectionEmail = async (guestEmail, guestName, listingTi
         console.log('📧 EmailJS: Recipient email:', guestEmail);
 
         const response = await emailjs.send(
-            SERVICE_ID,
+            SERVICE_ID_BOOKING,
             TEMPLATE_ID_BOOKING_REJECTION,
-            templateParams
+            templateParams,
+            PUBLIC_KEY_BOOKING
         );
 
         console.log('✅ Booking rejection email sent successfully!', response);

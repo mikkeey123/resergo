@@ -26,7 +26,9 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
     // Check if we're on a page where search filter should be hidden
     const shouldHideSearchFilter = location.pathname === '/guest/favorites' || 
                                    location.pathname === '/guest/bookings' || 
-                                   location.pathname === '/guest/payments';
+                                   location.pathname === '/guest/payments' ||
+                                   location.pathname === '/user-details' ||
+                                   location.pathname.startsWith('/listing/');
     
     // Check if we're on a listing detail page
     const isListingDetailPage = location.pathname.startsWith('/listing/');
@@ -165,14 +167,21 @@ const Navbar = ({ currentPage, onNavigateToUserDetails, onNavigateToGuest, onNav
             <div className="flex items-center max-w-7xl mx-auto relative">
 
                 {/* Left - Logo */}
-                <div 
-                    className="flex items-center gap-2"
+                <button 
+                    onClick={() => {
+                        if (currentPage === "guest" || currentPage === "userDetails") {
+                            onNavigateToGuest && onNavigateToGuest();
+                        } else {
+                            onNavigateToHome && onNavigateToHome();
+                        }
+                    }}
+                    className="flex items-center gap-2 cursor-pointer focus:outline-none bg-transparent border-none p-0 text-left"
                 > 
                     <img src={logo} alt="ReserGo Logo" className="h-8 w-8" />
                     <h1 className="text-2xl font-bold text-blue-600">
                         ReserGo
                     </h1>
-                </div>
+                </button>
 
                 {/* Center - Navigation Links (Landing Page) or Search Bar */}
                 {currentPage === "home" ? (
