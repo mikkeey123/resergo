@@ -438,12 +438,18 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
     return validPhotos;
   }, [fullListingData, listing]);
 
+  const baseRate = fullListingData?.rate || listing?.price || 0;
+  const discount = Number(fullListingData?.discount || listing?.discount || 0);
+  const discountedPrice = discount > 0 ? baseRate * (1 - discount / 100) : baseRate;
+
   // Use real listing data from Firestore with fallbacks
   const listingData = {
     id: fullListingData?.id || listing?.id || 1,
     title: fullListingData?.title || listing?.title || "Untitled Listing",
     description: fullListingData?.description || listing?.description || "No description available",
-    price: fullListingData?.rate || listing?.price || 0,
+    price: baseRate,
+    discountedPrice: discountedPrice,
+    discount: discount,
     currency: listing?.currency || "₱",
     rating: reviews.length > 0 
       ? (fullListingData?.rating || listing?.rating || 0)
@@ -729,7 +735,7 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
     setCouponError("");
     
     try {
-      const basePrice = listingData.price;
+      const basePrice = listingData.discountedPrice || listingData.price;
       const nights = checkIn && checkOut ? Math.ceil((new Date(checkOut) - new Date(checkIn)) / (1000 * 60 * 60 * 24)) : 1;
       const totalPrice = basePrice * nights;
       
@@ -804,16 +810,17 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
   };
 
   const calculateTotal = () => {
+    const basePrice = listingData.discountedPrice || listingData.price;
     if (!checkIn || !checkOut) {
-      return listingData.price;
+      return basePrice;
     }
     const checkInDate = new Date(checkIn);
     const checkOutDate = new Date(checkOut);
     if (checkOutDate <= checkInDate) {
-      return listingData.price;
+      return basePrice;
     }
     const nights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
-    const baseTotal = listingData.price * nights;
+    const baseTotal = basePrice * nights;
     
     // Apply coupon discount if available
     if (appliedCoupon && appliedCoupon.valid) {
@@ -1807,9 +1814,25 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
             <div className="sticky top-20 border border-gray-200 rounded-xl p-4 md:p-6 shadow-md bg-white">
               <div className="mb-4">
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-2xl font-bold text-gray-900">
-                    {listingData.currency}{listingData.price.toLocaleString()}
-                  </span>
+                  <div className="flex flex-col">
+                    {listingData.discount > 0 ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xl font-bold text-red-600">
+                          {listingData.currency}{listingData.discountedPrice.toLocaleString()}
+                        </span>
+                        <span className="text-lg text-gray-400 line-through">
+                          {listingData.currency}{listingData.price.toLocaleString()}
+                        </span>
+                        <span className="bg-red-100 text-red-700 px-2 py-0.5 rounded text-xs font-bold">
+                          -{listingData.discount}%
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-2xl font-bold text-gray-900">
+                        {listingData.currency}{listingData.price.toLocaleString()}
+                      </span>
+                    )}
+                  </div>
                   <span className="text-gray-600">
                     {fullListingData?.category === "Home" ? "night" :
                      fullListingData?.category === "Experience" ? "per person" :
@@ -1872,14 +1895,15 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
                 {(() => {
                   const category = fullListingData?.category || "Home";
                   if (category === "Home" && nights > 0) {
+                    const activePrice = listingData.discountedPrice || listingData.price;
                     return (
                       <div className="mb-2">
                         <div className="flex justify-between text-sm text-gray-600 mb-1">
                           <span>
-                            {listingData.currency}{listingData.price.toLocaleString()} x {nights} {nights === 1 ? 'night' : 'nights'}
+                            {listingData.currency}{activePrice.toLocaleString()} x {nights} {nights === 1 ? 'night' : 'nights'}
                           </span>
                           <span>
-                            {listingData.currency}{(listingData.price * nights).toLocaleString()}
+                            {listingData.currency}{(activePrice * nights).toLocaleString()}
                           </span>
                         </div>
                         {appliedCoupon && appliedCoupon.valid && (
@@ -1895,12 +1919,13 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
                       </div>
                     );
                   } else if (category === "Experience" && bookingDate && experienceGroupSize > 0) {
-                    const total = listingData.price * experienceGroupSize;
+                    const activePrice = listingData.discountedPrice || listingData.price;
+                    const total = activePrice * experienceGroupSize;
                     return (
                       <div className="mb-2">
                         <div className="flex justify-between text-sm text-gray-600 mb-1">
                           <span>
-                            {listingData.currency}{listingData.price.toLocaleString()} x {experienceGroupSize} {experienceGroupSize === 1 ? 'person' : 'people'}
+                            {listingData.currency}{activePrice.toLocaleString()} x {experienceGroupSize} {experienceGroupSize === 1 ? 'person' : 'people'}
                           </span>
                           <span>
                             {listingData.currency}{total.toLocaleString()}
@@ -1919,11 +1944,12 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
                       </div>
                     );
                   } else if (category === "Service" && bookingDate) {
+                    const activePrice = listingData.discountedPrice || listingData.price;
                     return (
                       <div className="mb-2">
                         <div className="flex justify-between text-sm text-gray-600 mb-1">
                           <span>Service Fee</span>
-                          <span>{listingData.currency}{listingData.price.toLocaleString()}</span>
+                          <span>{listingData.currency}{activePrice.toLocaleString()}</span>
                         </div>
                         {appliedCoupon && appliedCoupon.valid && (
                           <div className="flex justify-between text-sm text-green-600 mb-1">
@@ -1933,7 +1959,7 @@ const ListingDetail = ({ listing, onBack, onNavigateToMessages }) => {
                         )}
                         <div className="flex justify-between font-semibold text-gray-900 border-t border-gray-200 pt-2 mt-2">
                           <span>Total</span>
-                          <span>{listingData.currency}{(appliedCoupon && appliedCoupon.valid ? listingData.price - appliedCoupon.discountAmount : listingData.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          <span>{listingData.currency}{(appliedCoupon && appliedCoupon.valid ? activePrice - appliedCoupon.discountAmount : activePrice).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                         </div>
                       </div>
                     );

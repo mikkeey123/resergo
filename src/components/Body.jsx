@@ -83,6 +83,8 @@ const Body = ({ activeSelection, showDynamicSection = true, onListingClick, sear
                         id: listing.id,
                         title: listing.title || "Untitled Listing",
                         price: listing.rate || 0,
+                        discountedPrice: listing.discount > 0 ? (listing.rate || 0) * (1 - (listing.discount || 0) / 100) : listing.rate || 0,
+                        discount: listing.discount || 0,
                         rating: listing.rating || null, // Use actual rating from Firestore
                         image: imageUrl,
                         photos: listing.images || [],

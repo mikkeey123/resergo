@@ -2015,7 +2015,9 @@ export const createBooking = async (listingId, bookingData) => {
             checkOutDate = new Date(bookingData.checkOut);
             nights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
             const listingRate = listing.rate || listing.price || 0;
-            basePrice = listingRate * nights;
+            const discount = Number(listing.discount || 0);
+            const activeRate = discount > 0 ? listingRate * (1 - discount / 100) : listingRate;
+            basePrice = activeRate * nights;
         } else if (category === "Experience" || category === "Service") {
             // Experience/Service bookings use bookingDate
             if (!bookingData.bookingDate) {
@@ -2026,7 +2028,14 @@ export const createBooking = async (listingId, bookingData) => {
             checkInDate = bookingDate;
             checkOutDate = bookingDate;
             const listingRate = listing.rate || listing.price || 0;
-            basePrice = listingRate; // Single day/event price
+            const discount = Number(listing.discount || 0);
+            const activeRate = discount > 0 ? listingRate * (1 - discount / 100) : listingRate;
+            
+            if (category === "Experience" && bookingData.groupSize) {
+                basePrice = activeRate * bookingData.groupSize;
+            } else {
+                basePrice = activeRate; // Single event/service price
+            }
         } else {
             throw new Error("Invalid listing category");
         }
