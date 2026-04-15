@@ -98,6 +98,16 @@ const Adminpage = () => {
         maxAmount: ""
     });
     const [generatingReport, setGeneratingReport] = useState(false);
+    
+    // Withdrawal Confirmation Modal state
+    const [confirmModal, setConfirmModal] = useState({ 
+        isOpen: false, 
+        action: '', // 'approve' or 'reject'
+        transactionId: null, 
+        amount: '', 
+        username: '' 
+    });
+    const [rejectionReason, setRejectionReason] = useState("");
 
     // Function to fetch and update user data
     const fetchUserData = async (user) => {
@@ -212,7 +222,7 @@ const Adminpage = () => {
 
     // Fetch admin data when tab changes
     useEffect(() => {
-        if (activeTab === "analytics" || activeTab === "reviews" || activeTab === "bookings" || activeTab === "payments") {
+        if (activeTab === "analytics" || activeTab === "reviews" || activeTab === "bookings" || activeTab === "payments" || activeTab === "withdrawals") {
             fetchAdminData();
         }
         if (activeTab === "policies") {
@@ -800,6 +810,7 @@ const Adminpage = () => {
         { id: "policies", label: "Policy & Compliance", icon: <FaShieldAlt /> },
         { id: "reports", label: "Reports", icon: <FaFileAlt /> },
         { id: "payments", label: "Payments", icon: <FaDollarSign /> },
+        { id: "withdrawals", label: "Withdrawals", icon: <FaCreditCard /> },
         { id: "serviceFees", label: "Service Fees", icon: <FaCog /> },
         { id: "settings", label: "Account", icon: <FaUser /> },
     ];
@@ -828,7 +839,7 @@ const Adminpage = () => {
     );
 
     // Transaction Table Component
-    const TransactionTable = ({ transactions, processingTransactionId, setProcessingTransactionId, setTransactionMessage, approveWithdrawal, rejectWithdrawal, getAllTransactions, setTransactions }) => {
+    const TransactionTable = ({ transactions, processingTransactionId, setConfirmModal }) => {
         const [transactionUsers, setTransactionUsers] = useState({});
         const [loadingUsers, setLoadingUsers] = useState(true);
 
@@ -927,40 +938,14 @@ const Adminpage = () => {
                                                 {transaction.status === "pending" && transaction.type === "withdrawal" && (
                                                     <>
                                                         <button
-                                                            onClick={async () => {
-                                                                const amount = (transaction.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                                                                const confirmMessage = `Are you sure you want to approve this withdrawal?\n\nAmount: ₱${amount}\nUsername: ${userInfo.username || 'N/A'}\n\nThis will deduct the amount from the user's wallet.`;
-                                                                
-                                                                if (window.confirm(confirmMessage)) {
-                                                                    setProcessingTransactionId(transaction.id);
-                                                                    setTransactionMessage({ type: '', text: '' });
-                                                                    
-                                                                    try {
-                                                                        const result = await approveWithdrawal(transaction.id);
-                                                                        setTransactionMessage({ 
-                                                                            type: 'success', 
-                                                                            text: `Withdrawal approved successfully! New wallet balance: ₱${(result.newBalance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
-                                                                        });
-                                                                        
-                                                                        // Reload transactions after a short delay
-                                                                        setTimeout(async () => {
-                                                                            const transactionsData = await getAllTransactions();
-                                                                            setTransactions(transactionsData);
-                                                                            setTransactionMessage({ type: '', text: '' });
-                                                                        }, 1500);
-                                                                    } catch (error) {
-                                                                        console.error("Error approving withdrawal:", error);
-                                                                        setTransactionMessage({ 
-                                                                            type: 'error', 
-                                                                            text: error.message || "Failed to approve withdrawal. Please check the console for details." 
-                                                                        });
-                                                                        setTimeout(() => {
-                                                                            setTransactionMessage({ type: '', text: '' });
-                                                                        }, 5000);
-                                                                    } finally {
-                                                                        setProcessingTransactionId(null);
-                                                                    }
-                                                                }
+                                                            onClick={() => {
+                                                                setConfirmModal({
+                                                                    isOpen: true,
+                                                                    action: 'approve',
+                                                                    transactionId: transaction.id,
+                                                                    amount: (transaction.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                                                                    username: userInfo.username || 'N/A'
+                                                                });
                                                             }}
                                                             disabled={processingTransactionId === transaction.id}
                                                             className={`p-2 text-green-600 hover:bg-green-50 rounded transition ${
@@ -975,43 +960,14 @@ const Adminpage = () => {
                                                             )}
                                                         </button>
                                                         <button
-                                                            onClick={async () => {
-                                                                const amount = (transaction.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                                                                const confirmMessage = `Are you sure you want to reject this withdrawal?\n\nAmount: ₱${amount}\nUsername: ${userInfo.username || 'N/A'}\n\nThe user's wallet balance will remain unchanged.`;
-                                                                
-                                                                if (window.confirm(confirmMessage)) {
-                                                                    const reason = window.prompt("Enter rejection reason (optional):\n\nLeave empty for default reason.");
-                                                                    if (reason !== null) { // User didn't cancel
-                                                                        setProcessingTransactionId(transaction.id);
-                                                                        setTransactionMessage({ type: '', text: '' });
-                                                                        
-                                                                        try {
-                                                                            await rejectWithdrawal(transaction.id, reason || "");
-                                                                            setTransactionMessage({ 
-                                                                                type: 'success', 
-                                                                                text: "Withdrawal rejected successfully!" 
-                                                                            });
-                                                                            
-                                                                            // Reload transactions after a short delay
-                                                                            setTimeout(async () => {
-                                                                                const transactionsData = await getAllTransactions();
-                                                                                setTransactions(transactionsData);
-                                                                                setTransactionMessage({ type: '', text: '' });
-                                                                            }, 1500);
-                                                                        } catch (error) {
-                                                                            console.error("Error rejecting withdrawal:", error);
-                                                                            setTransactionMessage({ 
-                                                                                type: 'error', 
-                                                                                text: error.message || "Failed to reject withdrawal. Please check the console for details." 
-                                                                            });
-                                                                            setTimeout(() => {
-                                                                                setTransactionMessage({ type: '', text: '' });
-                                                                            }, 5000);
-                                                                        } finally {
-                                                                            setProcessingTransactionId(null);
-                                                                        }
-                                                                    }
-                                                                }
+                                                            onClick={() => {
+                                                                setConfirmModal({
+                                                                    isOpen: true,
+                                                                    action: 'reject',
+                                                                    transactionId: transaction.id,
+                                                                    amount: (transaction.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                                                                    username: userInfo.username || 'N/A'
+                                                                });
                                                             }}
                                                             disabled={processingTransactionId === transaction.id}
                                                             className={`p-2 text-red-600 hover:bg-red-50 rounded transition ${
@@ -1035,6 +991,118 @@ const Adminpage = () => {
                         )}
                     </tbody>
                 </table>
+            </div>
+        );
+    };
+
+    // Custom Confirmation Modal Component
+    const WithdrawalConfirmModal = () => {
+        if (!confirmModal.isOpen) return null;
+
+        const isApprove = confirmModal.action === 'approve';
+
+        const handleConfirm = async () => {
+            setProcessingTransactionId(confirmModal.transactionId);
+            setTransactionMessage({ type: '', text: '' });
+            
+            try {
+                if (isApprove) {
+                    const result = await approveWithdrawal(confirmModal.transactionId);
+                    setTransactionMessage({ 
+                        type: 'success', 
+                        text: `Withdrawal approved successfully! New wallet balance: ₱${(result.newBalance || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
+                    });
+                } else {
+                    await rejectWithdrawal(confirmModal.transactionId, rejectionReason || "");
+                    setTransactionMessage({ 
+                        type: 'success', 
+                        text: "Withdrawal rejected successfully!" 
+                    });
+                }
+                
+                // Reload transactions after a short delay
+                setTimeout(async () => {
+                    const transactionsData = await getAllTransactions();
+                    setTransactions(transactionsData);
+                    setTransactionMessage({ type: '', text: '' });
+                }, 1500);
+            } catch (error) {
+                console.error(`Error ${isApprove ? 'approving' : 'rejecting'} withdrawal:`, error);
+                setTransactionMessage({ 
+                    type: 'error', 
+                    text: error.message || `Failed to ${isApprove ? 'approve' : 'reject'} withdrawal. Please check the console for details.` 
+                });
+                setTimeout(() => {
+                    setTransactionMessage({ type: '', text: '' });
+                }, 5000);
+            } finally {
+                setProcessingTransactionId(null);
+                setConfirmModal({ ...confirmModal, isOpen: false });
+                setRejectionReason("");
+            }
+        };
+
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-fade-in">
+                    <div className={`p-4 border-b ${isApprove ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
+                        <div className="flex items-center gap-3">
+                            {isApprove ? <FaCheckCircle className="text-green-600 text-xl" /> : <FaTimesCircle className="text-red-600 text-xl" />}
+                            <h3 className={`font-bold text-lg ${isApprove ? 'text-green-800' : 'text-red-800'}`}>
+                                Confirm {isApprove ? 'Approval' : 'Rejection'}
+                            </h3>
+                        </div>
+                    </div>
+                    
+                    <div className="p-6 space-y-4">
+                        <p className="text-gray-700">
+                            Are you sure you want to {isApprove ? 'approve' : 'reject'} this withdrawal?
+                        </p>
+                        <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                            <p className="text-sm"><span className="font-semibold text-gray-700">Username:</span> {confirmModal.username}</p>
+                            <p className="text-sm"><span className="font-semibold text-gray-700">Amount:</span> ₱{confirmModal.amount}</p>
+                        </div>
+                        
+                        {!isApprove && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Rejection Reason (Optional)</label>
+                                <textarea
+                                    className="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-red-500 focus:outline-none"
+                                    rows="3"
+                                    placeholder="Enter rejection reason..."
+                                    value={rejectionReason}
+                                    onChange={(e) => setRejectionReason(e.target.value)}
+                                />
+                            </div>
+                        )}
+                        
+                        <p className="text-sm text-gray-500 italic">
+                            {isApprove ? "This will deduct the amount from the user's wallet." : "The user's wallet balance will remain unchanged."}
+                        </p>
+                    </div>
+                    
+                    <div className="p-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50">
+                        <button
+                            onClick={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+                            className="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg transition font-medium"
+                            disabled={processingTransactionId === confirmModal.transactionId}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleConfirm}
+                            className={`px-4 py-2 text-white rounded-lg transition font-medium flex items-center gap-2 ${
+                                isApprove ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
+                            }`}
+                            disabled={processingTransactionId === confirmModal.transactionId}
+                        >
+                            {processingTransactionId === confirmModal.transactionId && (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            )}
+                            Confirm {isApprove ? 'Approval' : 'Rejection'}
+                        </button>
+                    </div>
+                </div>
             </div>
         );
     };
@@ -1903,6 +1971,12 @@ const Adminpage = () => {
                                 <h2 className="text-xl font-semibold text-gray-900 mb-6">E-Wallet</h2>
                                 <EWallet />
                             </div>
+                        </div>
+                    )}
+
+                    {/* Withdrawals Tab */}
+                    {!loading && activeTab === "withdrawals" && (
+                        <div className="space-y-6">
                             <div className="bg-white rounded-lg shadow-md p-4 md:p-6 border border-gray-200">
                                 <h2 className="text-xl font-semibold text-gray-900 mb-6">Payment Review & Confirmation</h2>
                                 
@@ -1927,14 +2001,10 @@ const Adminpage = () => {
                                 {transactions.length === 0 ? (
                                     <p className="text-center py-8 text-gray-500">No transactions to review.</p>
                                 ) : (
-                                    <TransactionTable transactions={transactions} 
+                                    <TransactionTable 
+                                        transactions={transactions} 
                                         processingTransactionId={processingTransactionId}
-                                        setProcessingTransactionId={setProcessingTransactionId}
-                                        setTransactionMessage={setTransactionMessage}
-                                        approveWithdrawal={approveWithdrawal}
-                                        rejectWithdrawal={rejectWithdrawal}
-                                        getAllTransactions={getAllTransactions}
-                                        setTransactions={setTransactions}
+                                        setConfirmModal={setConfirmModal}
                                     />
                                 )}
                             </div>
@@ -2055,6 +2125,9 @@ const Adminpage = () => {
                     )}
                 </div>
             </div>
+            
+            {/* Confirmation Modal Rendered Outside Main Flow */}
+            <WithdrawalConfirmModal />
         </div>
     );
 };

@@ -5,6 +5,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { useLocation } from "react-router-dom";
 import { PayPalScriptProvider, PayPalButtons, usePayPalScriptReducer } from "@paypal/react-paypal-js";
 import { PAYPAL_CONFIG, paypalSdkOptions, isPayPalConfigured } from "../config/paypal";
+import AlertPopup from "./AlertPopup";
 
 // Withdraw Modal Component - Fully isolated to prevent re-renders
 const WithdrawModal = React.memo(({ 
@@ -222,6 +223,7 @@ const EWallet = ({ userId = null }) => {
     const [currentUserId, setCurrentUserId] = useState(null);
     const [paypalError, setPaypalError] = useState("");
     const [debouncedAmount, setDebouncedAmount] = useState("");
+    const [alertData, setAlertData] = useState({ isOpen: false, type: "info", title: "", message: "" });
     const location = useLocation();
 
     // Get current user
@@ -302,7 +304,12 @@ const EWallet = ({ userId = null }) => {
             const history = await getTransactionHistory(targetUserId);
             setTransactions(history);
             
-            alert(`Successfully topped up ₱${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}!`);
+            setAlertData({
+                isOpen: true,
+                type: "success",
+                title: "Top-Up Successful",
+                message: `Successfully topped up ₱${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}!`
+            });
         } catch (error) {
             console.error("Error processing top-up:", error);
             setPaypalError(error.message || "Failed to process top-up. Please contact support.");
@@ -353,12 +360,12 @@ const EWallet = ({ userId = null }) => {
     // Handle withdrawal - receive values from modal refs
     const handleWithdraw = useCallback(async ({ amount, email }) => {
         if (!amount || parseFloat(amount) <= 0) {
-            alert("Please enter a valid amount");
+            setAlertData({ isOpen: true, type: "error", title: "Invalid Amount", message: "Please enter a valid amount greater than 0." });
             return;
         }
 
         if (!email || !email.includes("@")) {
-            alert("Please enter a valid PayPal email address");
+            setAlertData({ isOpen: true, type: "error", title: "Invalid Email", message: "Please enter a valid PayPal email address." });
             return;
         }
 
@@ -381,10 +388,20 @@ const EWallet = ({ userId = null }) => {
             // Reload transaction history
             const history = await getTransactionHistory(targetUserId);
             setTransactions(history);
-            alert(`Withdrawal request of ₱${amountValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} submitted successfully! Your request is pending admin approval. The money will remain in your wallet until approved.`);
+            setAlertData({
+                isOpen: true,
+                type: "success",
+                title: "Withdrawal Requested",
+                message: `Withdrawal request of ₱${amountValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} submitted successfully! Your request is pending admin approval.`
+            });
         } catch (error) {
             console.error("Error withdrawing from wallet:", error);
-            alert(`Error: ${error.message || "Failed to withdraw from wallet"}`);
+            setAlertData({
+                isOpen: true,
+                type: "error",
+                title: "Withdrawal Failed",
+                message: error.message || "Failed to withdraw from wallet"
+            });
         } finally {
             setProcessing(false);
         }
@@ -643,6 +660,16 @@ const EWallet = ({ userId = null }) => {
                     processing={processing}
                     onClose={handleWithdrawClose}
                     onSubmit={handleWithdraw}
+                />
+
+                {/* Alert Popups */}
+                <AlertPopup
+                    isOpen={alertData.isOpen}
+                    type={alertData.type}
+                    title={alertData.title}
+                    message={alertData.message}
+                    dismissible={true}
+                    onDismiss={() => setAlertData({ ...alertData, isOpen: false })}
                 />
             </div>
     );
